@@ -56,6 +56,7 @@ if (headers.includes('cdn.jsdelivr.net') || headers.includes('*.supabase.co')) {
 
 if (!controlPlane.includes("'/api/v1/user/repos'")) throw new Error('Control plane must create real Gitea repositories.');
 if (!controlPlane.includes("'/v1/deployments'")) throw new Error('Control plane must use the runtime deployment adapter.');
+if (!controlPlane.includes('DASHBOARD_ORIGINS') || !controlPlane.includes('access-control-allow-origin')) throw new Error('Control plane must enforce an explicit browser-origin allowlist.');
 if (!compose.includes('gitea/gitea:1.27.3')) throw new Error('Pinned Gitea service is missing.');
 if (!compose.includes('traefik:v3.7.13')) throw new Error('Pinned Traefik service is missing.');
 
