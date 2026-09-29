@@ -78,6 +78,64 @@ This repository follows an open-source-first workflow. Public source is not trea
 - Copied source: none.
 - Reason not adopted: Electron/local-runtime architecture is incompatible with the desired Cloudflare deployment, and the mixed licensing boundary makes selective source reuse require more care than needed for this implementation.
 
+
+# DevCloud platform components
+
+## Gitea
+
+- Project: `go-gitea/gitea`
+- Version: 1.27.3
+- License: MIT.
+- Purpose: self-hosted Git repositories, branches, pull requests, issues, packages and Actions-compatible workflow surfaces.
+- Integration method: pinned container image plus REST/CLI APIs.
+- Source copied: none.
+- Security note: public registration is disabled in the bootstrap configuration.
+
+## Traefik
+
+- Project: `traefik/traefik`
+- Version: 3.7.13
+- License: MIT.
+- Purpose: HTTP routing for the DevCloud dashboard, Git service, API, Supabase endpoints and managed application containers.
+- Integration method: pinned container image and Docker labels.
+- Source copied: none.
+
+## Supabase self-hosted Docker distribution
+
+- Project: `supabase/supabase`
+- Pinned ref: `self-hosted/v0.8.2`
+- License: Apache-2.0 at repository level; individual bundled services retain their own compatible licenses.
+- Purpose: optional self-hosted PostgreSQL, Auth, PostgREST, Realtime, Storage, Edge Functions and Studio data plane.
+- Integration method: the DevCloud bootstrap executes Supabase's official self-host setup from the pinned upstream ref; the Supabase source/configuration is not vendored into this repository.
+- Modifications: a local Compose override adds DevCloud's external network and Traefik routing.
+- Important boundary: upstream documents self-hosted Supabase as one project, so this milestone does not claim multi-project Supabase control-plane parity.
+
+## Docker Engine API
+
+- Project: `moby/moby` / Docker Engine API.
+- Purpose: first single-node runtime adapter.
+- Integration method: a narrow internal runtime agent speaks the Engine HTTP API over the Unix socket.
+- Source copied: none.
+- Security note: Docker-socket access is host-equivalent privilege; the runtime agent is internal-only and intended to be replaced by the k3s adapter for multi-tenant deployments.
+
+# DevCloud architectural references
+
+## K3s
+
+- Project: `k3s-io/k3s`
+- License: Apache-2.0.
+- Purpose: planned multi-node runtime/orchestration adapter.
+- Integration method: architectural/runtime reference only in this milestone.
+- Source copied: none.
+
+## Cloudflare workerd
+
+- Project: `cloudflare/workerd`
+- License: Apache-2.0.
+- Purpose: planned Workers-compatible JavaScript/Wasm runtime adapter.
+- Integration method: architectural reference only in this milestone.
+- Source copied: none.
+
 # Builder source license
 
 Original application code in this repository is provided under the MIT License. External services, models, generated project dependencies, and architectural references retain their own terms.
