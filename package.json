@@ -1,8 +1,8 @@
 {
-  "name": "open-source-app-builder",
-  "version": "2.0.0",
+  "name": "devcloud-console",
+  "version": "3.0.0",
   "private": true,
-  "description": "Open-source-first app builder with GitHub research, Supabase workflow state, Hugging Face source generation, and Cloudflare deployment.",
+  "description": "Cloudflare-hosted DevCloud console for the self-hosted Git, backend, routing, and application runtime control plane.",
   "type": "module",
   "scripts": {
     "dev": "npm run build && node scripts/serve.mjs",
