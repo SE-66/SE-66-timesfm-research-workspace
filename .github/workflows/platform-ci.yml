@@ -36,6 +36,9 @@ jobs:
       - name: Check bootstrap shell syntax
         working-directory: platform
         run: sh -n scripts/bootstrap.sh && sh -n scripts/bootstrap-supabase.sh
+      - name: Build control-plane and runtime images
+        working-directory: platform
+        run: docker compose build control-plane runtime-agent
       - name: Render Docker Compose
         working-directory: platform
         env:
