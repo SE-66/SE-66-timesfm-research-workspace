@@ -1,32 +1,331 @@
-const cfg=globalThis.__OPEN_SOURCE_APP_BUILDER_CONFIG__??{};
-const supabaseUrl=cfg.supabaseUrl?.trim(),supabasePublishableKey=cfg.supabasePublishableKey?.trim();
-const $=s=>document.querySelector(s), ui={
- state:$('#supabase-state'),form:$('#project-form'),name:$('#project-name'),brief:$('#project-brief'),stack:$('#stack-preferences'),target:$('#deployment-target'),query:$('#oss-query'),research:$('#research-button'),projectMsg:$('#project-message'),pipeline:$('#pipeline'),run:$('#run-label'),researchSection:$('#research-section'),caveat:$('#research-caveat'),candidates:$('#candidate-list'),refreshResearch:$('#refresh-research'),save:$('#save-decisions'),decisionMsg:$('#decision-message'),custom:$('#custom-implementation'),customWhy:$('#custom-rationale'),generation:$('#generation-section'),token:$('#hf-token'),model:$('#hf-model'),generate:$('#generate-button'),generationMsg:$('#generation-message'),artifact:$('#artifact-section'),verification:$('#verification-badge'),summary:$('#artifact-summary'),files:$('#artifact-files'),commands:$('#verification-commands'),limits:$('#artifact-limitations'),zip:$('#download-zip'),json:$('#download-json'),refreshProjects:$('#refresh-projects'),projects:$('#recent-projects')
+const cfg = globalThis.__DEV_CLOUD_CONFIG__ ?? {};
+const apiBase = String(cfg.devCloudApiUrl ?? '').trim().replace(/\/+$/, '');
+
+const $ = (selector) => document.querySelector(selector);
+const ui = {
+  state: $('#platform-state'),
+  apiUrl: $('#api-url'),
+  apiHelp: $('#api-help'),
+  token: $('#admin-token'),
+  connect: $('#connect-button'),
+  accessMessage: $('#access-message'),
+  gitState: $('#git-service-state'),
+  services: $('#service-list'),
+  form: $('#project-form'),
+  name: $('#project-name'),
+  slug: $('#project-slug'),
+  description: $('#project-description'),
+  create: $('#create-project-button'),
+  projectMessage: $('#project-message'),
+  refresh: $('#refresh-projects'),
+  projects: $('#project-list')
 };
-const stages=['inspect','research','license','understand','integrate','build','test','verify'];
-const stop=new Set('the and for from with this that app application build create using want should must users user web site system have has are was were into your'.split(' '));
-let client,project,run,candidates=[],decisions=[],artifact;
-const msg=(el,t,e=false)=>{el.textContent=t;el.dataset.error=String(e)}, busy=(b,on,t='Working…')=>{b.dataset.idle??=b.textContent;b.disabled=on;b.textContent=on?t:b.dataset.idle};
-const pipeline=(stage,blocked=false)=>{const a=stages.indexOf(stage);ui.pipeline.querySelectorAll('li').forEach(li=>{const s=li.dataset.stage,i=stages.indexOf(s);li.dataset.state=blocked&&(s==='test'||s==='verify')?'blocked':i<a?'done':i===a?'active':'pending'})};
-const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-const date=v=>{try{return v?new Intl.DateTimeFormat(undefined,{dateStyle:'medium'}).format(new Date(v)):'Unknown'}catch{return String(v||'Unknown')}};
-const stars=n=>new Intl.NumberFormat(undefined,{notation:Number(n)>=1000?'compact':'standard',maximumFractionDigits:1}).format(Number(n)||0);
-const slug=v=>String(v).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'generated-app';
-const derivedQuery=()=>[...new Set(`${ui.name.value} ${ui.brief.value}`.toLowerCase().replace(/[^a-z0-9+#.-]+/g,' ').split(/\s+/).filter(x=>x.length>2&&!stop.has(x)))].slice(0,8).join(' ');
-function download(name,blob){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.append(a);a.click();a.remove();URL.revokeObjectURL(u)}
-async function session(){const s=await client.auth.getSession();if(s.error)throw s.error;if(s.data.session)return s.data.session;const r=await client.auth.signInAnonymously();if(r.error)throw r.error;return r.data.session}
-async function recent(){if(!client)return;ui.projects.innerHTML='<p class="empty-state">Loading projects…</p>';const r=await client.from('builder_projects').select('id,name,status,deployment_target,created_at').order('created_at',{ascending:false}).limit(10);if(r.error)throw r.error;ui.projects.innerHTML=r.data?.length?r.data.map(p=>`<article class="recent-project"><div><strong>${esc(p.name)}</strong><span class="mini-status">${esc(p.status.replaceAll('_',' '))}</span></div><small>${esc(p.deployment_target)} · ${esc(date(p.created_at))}</small></article>`).join(''):'<p class="empty-state">No projects yet. Create one from the build brief.</p>'}
-const defaultWhy=c=>c.license_state==='permissive'&&c.maintenance_state==='active'?'Evaluate as a reusable dependency/component after reviewing LICENSE/NOTICE, documentation, dependencies, compatibility, and security posture.':'Use as architectural reference only unless deeper license, compatibility, and security review establishes direct reuse is appropriate.';
-function renderCandidates(){if(!candidates.length){ui.candidates.innerHTML='<p class="empty-state">No repositories returned. Refine the search or record a custom implementation decision.</p>';return}ui.candidates.innerHTML=candidates.map(c=>{const url=String(c.repository_url||'').startsWith('https://github.com/')?c.repository_url:'#';return `<article class="candidate-card" data-candidate-id="${esc(c.id)}"><div class="candidate-top"><label class="candidate-select"><input class="candidate-checkbox" type="checkbox"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(c.repository_full_name)}</a></label><div class="candidate-badges"><span class="badge" data-tone="${esc(c.license_state)}">${esc(c.license_spdx)} · ${esc(c.license_state)}</span><span class="badge" data-tone="${esc(c.maintenance_state)}">${esc(c.maintenance_state)}</span></div></div><p class="candidate-description">${esc(c.description||'No repository description.')}</p><p class="candidate-meta">${esc(stars(c.stars))} stars · ${esc(c.primary_language||'Language unknown')} · pushed ${esc(date(c.pushed_at))}</p><p class="candidate-notes">${esc(c.notes)}</p><div class="candidate-decision-grid"><label>Decision<select class="candidate-decision"><option value="reuse">Reuse</option><option value="reference" selected>Reference only</option><option value="reject">Reject</option></select></label><label>Integration method<select class="candidate-method">${['dependency','api','component','adapter','fork','reference','custom'].map(v=>`<option ${v==='reference'?'selected':''}>${v}</option>`).join('')}</select></label><label class="rationale-label">Rationale<textarea class="candidate-rationale" rows="3" maxlength="4000">${esc(defaultWhy(c))}</textarea></label></div></article>`}).join('')}
-async function newRun(){const r=await client.from('build_runs').insert({project_id:project.id,status:'researching',stage:'research'}).select('id,project_id,status,stage,started_at').single();if(r.error)throw r.error;return r.data}
-async function research(q){run=await newRun();candidates=[];decisions=[];artifact=null;ui.run.textContent=`Run ${run.id.slice(0,8)}`;pipeline('research');ui.researchSection.hidden=false;ui.generation.hidden=true;ui.artifact.hidden=true;ui.candidates.innerHTML='<p class="empty-state">Searching GitHub repositories…</p>';const f=await client.functions.invoke('research-open-source',{body:{query:q,limit:8}});if(f.error)throw f.error;if(!f.data||f.data.error)throw new Error(f.data?.error||'Open-source research failed.');const rows=f.data.candidates.map(c=>({...c,project_id:project.id,run_id:run.id}));if(rows.length){const s=await client.from('oss_candidates').insert(rows).select('id,project_id,run_id,repository_full_name,repository_url,description,license_spdx,stars,primary_language,pushed_at,archived,maintenance_state,license_state,notes,raw_metadata');if(s.error)throw s.error;candidates=s.data??[]}ui.caveat.textContent=f.data.caveat;renderCandidates();pipeline('license');await Promise.all([client.from('build_runs').update({status:'reviewing',stage:'license'}).eq('id',run.id),client.from('builder_projects').update({status:'ready',updated_at:new Date().toISOString()}).eq('id',project.id)]);project.status='ready';await recent()}
-async function createProject(e){e.preventDefault();if(!client)return;const q=ui.query.value.trim()||derivedQuery();if(!q)return msg(ui.projectMsg,'Add a more specific brief or search query.',true);busy(ui.research,true,'Creating & researching…');msg(ui.projectMsg,'Creating project…');pipeline('inspect');try{const r=await client.from('builder_projects').insert({name:ui.name.value.trim(),brief:ui.brief.value.trim(),stack_preferences:ui.stack.value.trim(),deployment_target:ui.target.value,status:'researching'}).select('id,name,brief,stack_preferences,deployment_target,status,created_at').single();if(r.error)throw r.error;project=r.data;msg(ui.projectMsg,`Project created. Researching: ${q}`);await research(q);msg(ui.projectMsg,'Research complete. Review candidates and record integration decisions.')}catch(e){msg(ui.projectMsg,e instanceof Error?e.message:'Project creation failed.',true);pipeline('inspect');if(project?.id)await client.from('builder_projects').update({status:'failed',updated_at:new Date().toISOString()}).eq('id',project.id)}finally{busy(ui.research,false)}}
-function decisionRows(){const rows=[];ui.candidates.querySelectorAll('.candidate-card').forEach(card=>{if(!card.querySelector('.candidate-checkbox').checked)return;const c=candidates.find(x=>x.id===card.dataset.candidateId),why=card.querySelector('.candidate-rationale').value.trim();if(!c)return;if(why.length<3)throw new Error(`Add a rationale for ${c.repository_full_name}.`);rows.push({project_id:project.id,run_id:run.id,candidate_id:c.id,decision:card.querySelector('.candidate-decision').value,integration_method:card.querySelector('.candidate-method').value,rationale:why})});if(ui.custom.checked){const why=ui.customWhy.value.trim();if(why.length<3)throw new Error('Explain why custom implementation is necessary.');rows.push({project_id:project.id,run_id:run.id,candidate_id:null,decision:'custom',integration_method:'custom',rationale:why})}if(!rows.length)throw new Error('Select at least one candidate or record a custom implementation decision.');return rows}
-async function save(){if(!run)return;busy(ui.save,true,'Saving…');try{const rows=decisionRows(),d=await client.from('integration_decisions').delete().eq('run_id',run.id);if(d.error)throw d.error;const r=await client.from('integration_decisions').insert(rows).select('id,candidate_id,decision,integration_method,rationale');if(r.error)throw r.error;decisions=(r.data??[]).map(x=>({...x,repository_full_name:candidates.find(c=>c.id===x.candidate_id)?.repository_full_name||'custom implementation'}));await client.from('build_runs').update({status:'reviewing',stage:'integrate'}).eq('id',run.id);pipeline('integrate');ui.generation.hidden=false;ui.generation.scrollIntoView({behavior:'smooth'});msg(ui.decisionMsg,'Integration decisions saved. Source generation is ready.')}catch(e){msg(ui.decisionMsg,e instanceof Error?e.message:'Could not save decisions.',true)}finally{busy(ui.save,false)}}
-function renderArtifact(b){ui.artifact.hidden=false;ui.summary.textContent=b.summary;ui.verification.textContent='Unverified · run generated project checks';ui.verification.dataset.state='warning';ui.files.innerHTML=b.files.map(f=>`<li>${esc(f.path)}</li>`).join('');const cmds=b.verification_commands?.length?b.verification_commands:['Review README.md and run the generated project install/test/build commands.'];ui.commands.innerHTML=cmds.map(c=>`<li><code>${esc(c)}</code></li>`).join('');const lim=b.limitations?.length?b.limitations:['No execution sandbox has verified this generated bundle yet.'];ui.limits.innerHTML=lim.map(x=>`<li>${esc(x)}</li>`).join('')}
-async function generate(){if(!project||!run)return;if(!decisions.length)return msg(ui.generationMsg,'Save integration decisions before generating source.',true);const token=ui.token.value.trim(),model=ui.model.value.trim();if(!token)return msg(ui.generationMsg,'Enter a Hugging Face token with Inference Providers permission.',true);busy(ui.generate,true,'Generating…');msg(ui.generationMsg,'Generating source with selected research context…');pipeline('build');try{await Promise.all([client.from('build_runs').update({status:'generating',stage:'build',model}).eq('id',run.id),client.from('builder_projects').update({status:'generating',updated_at:new Date().toISOString()}).eq('id',project.id)]);const ids=new Set(decisions.map(x=>x.candidate_id).filter(Boolean)),selected=candidates.filter(c=>ids.has(c.id));const f=await client.functions.invoke('generate-app',{body:{project_name:project.name,brief:project.brief,stack_preferences:project.stack_preferences,deployment_target:project.deployment_target,hf_token:token,model,candidates:selected,decisions}});ui.token.value='';if(f.error)throw f.error;if(!f.data||f.data.error)throw new Error(f.data?.error||'Generation failed.');const filename=`${slug(project.name)}-source-bundle.json`,r=await client.from('builder_artifacts').insert({project_id:project.id,run_id:run.id,kind:'source_bundle',filename,content:f.data,verification_state:'unverified'}).select('id,filename,content,verification_state,created_at').single();if(r.error)throw r.error;artifact=r.data;await Promise.all([client.from('build_runs').update({status:'artifact_ready',stage:'artifact_ready',completed_at:new Date().toISOString()}).eq('id',run.id),client.from('builder_projects').update({status:'artifact_ready',updated_at:new Date().toISOString()}).eq('id',project.id)]);project.status='artifact_ready';pipeline('test',true);renderArtifact(f.data);await recent();ui.artifact.scrollIntoView({behavior:'smooth'});msg(ui.generationMsg,'Source bundle generated and saved. It remains unverified until its checks run.')}catch(e){ui.token.value='';const m=e instanceof Error?e.message:'Source generation failed.';msg(ui.generationMsg,m,true);await Promise.all([client.from('build_runs').update({status:'failed',stage:'failed',error_message:m,completed_at:new Date().toISOString()}).eq('id',run.id),client.from('builder_projects').update({status:'failed',updated_at:new Date().toISOString()}).eq('id',project.id)])}finally{busy(ui.generate,false)}}
-async function zip(){const b=artifact?.content;if(!b?.files?.length)return;if(!globalThis.JSZip)return msg(ui.generationMsg,'JSZip could not load. Use JSON download instead.',true);const z=new globalThis.JSZip();b.files.forEach(f=>z.file(f.path,f.content));download(`${slug(project.name)}.zip`,await z.generateAsync({type:'blob',compression:'DEFLATE'}))}
-function jsonDownload(){if(!artifact?.content)return;download(artifact.filename||`${slug(project.name)}-bundle.json`,new Blob([JSON.stringify(artifact.content,null,2)],{type:'application/json'}))}
-async function again(){if(!project)return;busy(ui.refreshResearch,true,'Researching…');try{await research(ui.query.value.trim()||derivedQuery());msg(ui.projectMsg,'New research run created. Review the new candidates.')}catch(e){msg(ui.projectMsg,e instanceof Error?e.message:'Research failed.',true)}finally{busy(ui.refreshResearch,false)}}
-async function init(){if(!supabaseUrl||!supabasePublishableKey){ui.state.textContent='Supabase not configured';ui.state.dataset.state='error';ui.research.disabled=true;return msg(ui.projectMsg,'Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in Cloudflare build variables.',true)}if(!globalThis.supabase?.createClient){ui.state.textContent='Supabase client unavailable';ui.state.dataset.state='error';return}client=globalThis.supabase.createClient(supabaseUrl,supabasePublishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});try{ui.state.textContent='Creating anonymous workspace…';await session();ui.state.textContent='Workspace connected';ui.state.dataset.state='ready';ui.research.disabled=false;await recent()}catch(e){ui.state.textContent='Supabase setup required';ui.state.dataset.state='error';ui.research.disabled=true;msg(ui.projectMsg,e instanceof Error?e.message:'Supabase initialization failed.',true)}}
-ui.form.addEventListener('submit',createProject);ui.save.addEventListener('click',save);ui.generate.addEventListener('click',generate);ui.zip.addEventListener('click',zip);ui.json.addEventListener('click',jsonDownload);ui.refreshResearch.addEventListener('click',again);ui.refreshProjects.addEventListener('click',()=>recent().catch(e=>ui.projects.innerHTML=`<p class="empty-state">${esc(e.message||'Could not refresh projects.')}</p>`));pipeline('inspect');init();
+
+const TOKEN_KEY = 'devcloud-admin-token';
+let slugEdited = false;
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function safeHttpUrl(value) {
+  try {
+    const parsed = new URL(String(value));
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.href : '#';
+  } catch {
+    return '#';
+  }
+}
+
+function toSlug(value) {
+  return String(value)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 63);
+}
+
+function setMessage(element, value, error = false) {
+  element.textContent = value;
+  element.dataset.error = String(error);
+}
+
+function setBusy(button, active, activeText = 'Working…') {
+  button.dataset.idle ??= button.textContent;
+  button.disabled = active;
+  button.textContent = active ? activeText : button.dataset.idle;
+}
+
+function setConnectedControls(enabled) {
+  ui.create.disabled = !enabled;
+  ui.refresh.disabled = !enabled;
+  ui.name.disabled = !enabled;
+  ui.slug.disabled = !enabled;
+  ui.description.disabled = !enabled;
+}
+
+function token() {
+  return sessionStorage.getItem(TOKEN_KEY) ?? '';
+}
+
+async function request(path, options = {}, needsAuth = true) {
+  if (!apiBase) throw new Error('DEV_CLOUD_API_URL is not configured for this deployment.');
+
+  const headers = {
+    accept: 'application/json',
+    ...(options.body ? { 'content-type': 'application/json' } : {}),
+    ...(options.headers ?? {})
+  };
+
+  if (needsAuth) {
+    const value = token();
+    if (!value) throw new Error('Enter the control-plane admin token first.');
+    headers.authorization = 'Bearer ' + value;
+  }
+
+  const response = await fetch(apiBase + path, { ...options, headers });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(payload.error || ('Control plane returned HTTP ' + response.status));
+  }
+
+  return payload;
+}
+
+async function checkHealth() {
+  if (!apiBase) {
+    ui.state.textContent = 'Control plane not configured';
+    ui.state.dataset.state = 'warning';
+    ui.gitState.textContent = 'Git unavailable';
+    ui.gitState.dataset.state = 'warning';
+    ui.apiUrl.value = 'Not configured';
+    ui.apiHelp.textContent = 'Set DEV_CLOUD_API_URL in the Cloudflare build variables after the DevCloud server is online.';
+    setConnectedControls(false);
+    return;
+  }
+
+  ui.apiUrl.value = apiBase;
+  ui.apiHelp.textContent = 'This public browser configuration contains only the API origin, never the admin token.';
+
+  try {
+    const health = await request('/api/health', {}, false);
+    ui.state.textContent = health.control_plane === 'ok' ? 'Control plane online' : 'Control plane degraded';
+    ui.state.dataset.state = health.control_plane === 'ok' ? 'ready' : 'warning';
+
+    ui.gitState.textContent = health.gitea === 'ok' ? 'Git online' : 'Git ' + String(health.gitea || 'unknown');
+    ui.gitState.dataset.state = health.gitea === 'ok' ? 'ready' : 'warning';
+
+    setConnectedControls(Boolean(token()));
+  } catch (error) {
+    ui.state.textContent = 'Control plane unreachable';
+    ui.state.dataset.state = 'error';
+    ui.gitState.textContent = 'Git unknown';
+    ui.gitState.dataset.state = 'error';
+    setConnectedControls(false);
+    setMessage(ui.accessMessage, error.message, true);
+  }
+}
+
+async function loadServices() {
+  const payload = await request('/api/services');
+  const entries = Object.entries(payload).filter(([, value]) => value);
+
+  ui.services.innerHTML = entries.length
+    ? entries.map(([name, value]) => {
+        const href = safeHttpUrl(value);
+        return '<a class="service-card" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' +
+          '<strong>' + escapeHtml(name.replaceAll('_', ' ')) + '</strong>' +
+          '<small>' + escapeHtml(value) + '</small></a>';
+      }).join('')
+    : '<p class="empty-state">No service endpoints were returned.</p>';
+}
+
+async function loadDeployments(projectId, target) {
+  try {
+    const payload = await request('/api/projects/' + encodeURIComponent(projectId) + '/deployments');
+
+    target.innerHTML = payload.deployments?.length
+      ? payload.deployments.map((deployment) => {
+          const url = safeHttpUrl(deployment.url);
+          return '<div class="deployment" data-deployment-id="' + escapeHtml(deployment.id) + '">' +
+            '<div class="deployment-main"><a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer">' +
+            escapeHtml(deployment.url) + '</a><small>' +
+            escapeHtml(deployment.image) + ' · ' + escapeHtml(deployment.status) + '</small></div>' +
+            (deployment.status === 'running'
+              ? '<button class="danger-button stop-deployment" type="button">Stop</button>'
+              : '') +
+            '</div>';
+        }).join('')
+      : '<p class="empty-state">No deployments yet.</p>';
+
+    for (const button of target.querySelectorAll('.stop-deployment')) {
+      button.addEventListener('click', async () => {
+        const deployment = button.closest('.deployment');
+        setBusy(button, true, 'Stopping…');
+        try {
+          await request('/api/deployments/' + encodeURIComponent(deployment.dataset.deploymentId), {
+            method: 'DELETE'
+          });
+          await loadDeployments(projectId, target);
+        } catch (error) {
+          window.alert(error.message);
+          setBusy(button, false);
+        }
+      });
+    }
+  } catch (error) {
+    target.innerHTML = '<p class="empty-state">' + escapeHtml(error.message) + '</p>';
+  }
+}
+
+async function deploy(projectId, card) {
+  const imageInput = card.querySelector('.deploy-image');
+  const portInput = card.querySelector('.deploy-port');
+  const button = card.querySelector('.deploy-button');
+  const image = imageInput.value.trim();
+  const containerPort = Number(portInput.value);
+
+  if (!image) {
+    window.alert('Enter a public OCI image reference.');
+    return;
+  }
+
+  setBusy(button, true, 'Deploying…');
+
+  try {
+    await request('/api/projects/' + encodeURIComponent(projectId) + '/deployments', {
+      method: 'POST',
+      body: JSON.stringify({
+        image,
+        container_port: containerPort
+      })
+    });
+
+    imageInput.value = '';
+    await loadDeployments(projectId, card.querySelector('.deployment-list'));
+  } catch (error) {
+    window.alert(error.message);
+  } finally {
+    setBusy(button, false);
+  }
+}
+
+async function loadProjects() {
+  ui.projects.innerHTML = '<p class="empty-state">Loading projects…</p>';
+  const payload = await request('/api/projects');
+
+  if (!payload.projects?.length) {
+    ui.projects.innerHTML = '<p class="empty-state">No DevCloud projects yet. Create one above.</p>';
+    return;
+  }
+
+  ui.projects.innerHTML = payload.projects.map((project) => {
+    const repoUrl = safeHttpUrl(project.repo_url);
+    return '<article class="project-card" data-project-id="' + escapeHtml(project.id) + '">' +
+      '<div class="project-card-head"><div><h3>' + escapeHtml(project.name) + '</h3>' +
+      '<p>' + escapeHtml(project.description || 'No description.') + '</p></div>' +
+      '<span class="project-slug">' + escapeHtml(project.slug) + '</span></div>' +
+      '<div class="project-card-body">' +
+      '<div class="repo-row"><strong>Repository</strong><a href="' + escapeHtml(repoUrl) +
+      '" target="_blank" rel="noopener noreferrer">' + escapeHtml(project.repo_url) + '</a></div>' +
+      '<div class="deploy-box"><strong>Deploy a public OCI image</strong>' +
+      '<div class="deploy-grid"><input class="deploy-image" placeholder="nginx:1.28-alpine or ghcr.io/org/app:v1" />' +
+      '<input class="deploy-port" type="number" min="1" max="65535" value="80" aria-label="Container port" /></div>' +
+      '<div><button class="primary-button deploy-button" type="button">Deploy image</button></div></div>' +
+      '<div class="deployment-list"><p class="empty-state">Loading deployments…</p></div>' +
+      '</div></article>';
+  }).join('');
+
+  for (const card of ui.projects.querySelectorAll('.project-card')) {
+    const projectId = card.dataset.projectId;
+    card.querySelector('.deploy-button').addEventListener('click', () => deploy(projectId, card));
+    loadDeployments(projectId, card.querySelector('.deployment-list'));
+  }
+}
+
+async function connect() {
+  const value = ui.token.value.trim();
+
+  if (!apiBase) {
+    setMessage(ui.accessMessage, 'The Cloudflare build does not have DEV_CLOUD_API_URL yet.', true);
+    return;
+  }
+
+  if (!value) {
+    setMessage(ui.accessMessage, 'Enter CONTROL_PLANE_API_TOKEN.', true);
+    return;
+  }
+
+  sessionStorage.setItem(TOKEN_KEY, value);
+  setBusy(ui.connect, true, 'Connecting…');
+
+  try {
+    await Promise.all([loadServices(), loadProjects()]);
+    setConnectedControls(true);
+    setMessage(ui.accessMessage, 'Connected. Admin token is stored for this browser tab only.');
+  } catch (error) {
+    sessionStorage.removeItem(TOKEN_KEY);
+    setConnectedControls(false);
+    setMessage(ui.accessMessage, error.message, true);
+  } finally {
+    setBusy(ui.connect, false);
+  }
+}
+
+async function createProject(event) {
+  event.preventDefault();
+
+  setBusy(ui.create, true, 'Creating…');
+  setMessage(ui.projectMessage, 'Creating private Gitea repository…');
+
+  try {
+    await request('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: ui.name.value.trim(),
+        slug: ui.slug.value.trim(),
+        description: ui.description.value.trim()
+      })
+    });
+
+    ui.form.reset();
+    slugEdited = false;
+    setMessage(ui.projectMessage, 'Project and private Git repository created.');
+    await loadProjects();
+  } catch (error) {
+    setMessage(ui.projectMessage, error.message, true);
+  } finally {
+    setBusy(ui.create, false);
+  }
+}
+
+ui.name.addEventListener('input', () => {
+  if (!slugEdited) ui.slug.value = toSlug(ui.name.value);
+});
+
+ui.slug.addEventListener('input', () => {
+  slugEdited = true;
+});
+
+ui.connect.addEventListener('click', connect);
+ui.form.addEventListener('submit', createProject);
+ui.refresh.addEventListener('click', () => loadProjects().catch((error) => {
+  ui.projects.innerHTML = '<p class="empty-state">' + escapeHtml(error.message) + '</p>';
+}));
+
+ui.token.value = token();
+setConnectedControls(false);
+checkHealth().then(() => {
+  if (apiBase && token()) {
+    Promise.all([loadServices(), loadProjects()])
+      .then(() => setConnectedControls(true))
+      .catch((error) => setMessage(ui.accessMessage, error.message, true));
+  }
+});
