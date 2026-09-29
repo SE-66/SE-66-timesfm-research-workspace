@@ -1,90 +1,101 @@
-# Architecture
+# DevCloud Architecture
 
-## Product goal
+## Product boundary
 
-Create applications by combining three distinct activities instead of collapsing them into one model prompt:
+DevCloud is split into two deployment surfaces:
 
-1. **research** reusable open-source projects;
-2. **record** a licensing/compatibility integration decision;
-3. **generate** the application-specific source bundle from the resulting evidence.
+1. a dependency-light browser console hosted as Cloudflare Workers Static Assets;
+2. a stateful self-hosted platform under `platform/`.
 
-The architecture deliberately keeps arbitrary generated-code execution outside the current control plane.
+Cloudflare hosts the control UI. It does not host Gitea, Docker, PostgreSQL, Supabase, or the runtime agent.
 
-## Browser application
+The detailed platform design is in [docs/DEV_CLOUD_ARCHITECTURE.md](./docs/DEV_CLOUD_ARCHITECTURE.md).
 
-The browser application is a dependency-light static UI built from:
+## Browser console
 
-- `src/index.html`
-- `src/styles.css`
-- `src/main.js`
+The root build consists of:
 
-It manages the workflow, renders research results, records decisions, requests source generation, and downloads the resulting source ZIP.
+- `src/index.html`;
+- `src/styles.css`;
+- `src/main.js`;
+- generated `dist/config.js`;
+- generated `dist/_headers`.
 
-The browser does not contain privileged credentials.
+The only build-time service setting is `DEV_CLOUD_API_URL`.
 
-## Supabase control plane
+The browser never receives the Gitea API token, runtime-agent token, Supabase secret key, Docker socket, or a preconfigured DevCloud admin token. The administrator enters `CONTROL_PLANE_API_TOKEN` interactively and the console stores it in `sessionStorage`.
 
-### Authentication
+## Control plane
 
-The builder creates or resumes a Supabase anonymous user. Anonymous users use the `authenticated` Postgres role, so RLS is mandatory.
+The Node 24 control plane is the application-level source of truth for DevCloud projects and deployments.
 
-### Data model
+Its current persistent records are:
 
-- `builder_projects` — application brief and project status.
-- `build_runs` — immutable-ish run identity plus current pipeline stage/status.
-- `oss_candidates` — GitHub repository discovery metadata.
-- `integration_decisions` — user decision about reuse/reference/reject/custom implementation.
-- `builder_artifacts` — generated source bundles and future build/verification artifacts.
+- `projects` — DevCloud id, slug, name, description, and Gitea repository URL;
+- `deployments` — project mapping, managed container id, image, host, URL, state, and creation time.
 
-All tables carry `user_id` and enforce ownership with RLS.
+The bootstrap implementation uses Node's built-in SQLite interface with foreign keys, WAL mode, and a busy timeout. This is a single-node control-plane store, not the long-term HA database design.
 
-### Edge Functions
+## Git plane
 
-#### `research-open-source`
+Gitea provides the actual Git repository system.
 
-- requires a valid Supabase JWT;
-- sends a bounded query to GitHub repository search;
-- uses a fixed GitHub API host;
-- classifies SPDX metadata into permissive/reciprocal/restricted/unknown/review categories;
-- derives a basic maintenance state from archive/push metadata;
-- returns discovery evidence and an explicit review caveat;
-- can optionally use a server-side `GITHUB_TOKEN`, but does not require one.
+Creating a DevCloud project calls Gitea's API to create a real private repository. DevCloud stores the returned repository URL rather than simulating repository state.
 
-It does not claim a repository is safe or compatible merely because search metadata looks favorable.
+## Data plane
 
-#### `generate-app`
+The optional backend/data layer follows Supabase's official self-hosted Docker distribution pinned to `self-hosted/v0.8.2`.
 
-- requires a valid Supabase JWT;
-- accepts the project brief, selected OSS evidence, explicit integration decisions, a user-supplied Hugging Face token, and model id;
-- sends the generation request only to `https://router.huggingface.co/v1/chat/completions`;
-- instructs the model not to copy external repository source;
-- requires `README.md` and `OPEN_SOURCE_COMPONENTS.md` in every generated bundle;
-- validates generated paths/file count/size before returning the artifact;
-- always returns `verification_state: "unverified"`.
+It provides PostgreSQL, Auth, PostgREST, Realtime, Storage, Edge Functions, and Studio.
 
-The Hugging Face token is request-scoped and is not inserted into Supabase.
+Upstream self-hosted Supabase represents one Supabase project, so this milestone treats it as a shared data-plane service. DevCloud does not claim managed Supabase multi-project parity.
 
-## Cloudflare
+## Runtime plane
 
-GitHub is the source repository. Cloudflare Workers Builds runs `npm run build` and `npx wrangler deploy`. `wrangler.jsonc` deploys the `dist/` directory through Workers Static Assets.
+The first runtime adapter is an internal Docker Engine API service.
 
-`public/_headers` becomes `dist/_headers` and constrains scripts/connections to the required browser dependencies and Supabase endpoints.
+It can pull a public OCI image, validate the requested deployment, create a managed container, attach it to the DevCloud network, register Traefik labels, and stop/delete containers carrying the DevCloud management label.
 
-## Generated-code execution boundary
+Because the runtime agent mounts the Docker socket, it has host-equivalent authority and is never exposed through the public ingress.
 
-The control plane does **not** execute generated project shell commands. Arbitrary package installation/build execution requires a dedicated sandbox with resource limits, network policy, secret isolation, timeout enforcement, artifact capture, and log redaction.
+The planned multi-tenant runtime adapter is k3s.
 
-Reviewed reference architectures include bolt.diy, OpenHands, and Dyad. Their runtime models are materially heavier than this Cloudflare/Supabase control plane, so they are architectural references rather than embedded dependencies.
+## Routing plane
 
-## Future adapters
+Traefik watches Docker labels and routes:
 
-Potential future boundaries:
+- the self-hosted dashboard;
+- Gitea;
+- control-plane API requests;
+- deployed application containers;
+- optional Supabase endpoints.
 
-- isolated sandbox executor;
-- GitHub repository/export adapter;
-- pull-request writer;
-- Cloudflare/Vercel/Netlify deployment adapters;
-- dependency vulnerability/license scanner;
-- model-provider adapters beyond Hugging Face.
+The development configuration uses HTTP. Production requires real DNS and TLS/ACME configuration.
 
-Each should be added behind a narrow interface without replacing Supabase as the control-plane source of truth.
+## Cloudflare-to-control-plane boundary
+
+For the Cloudflare-hosted console:
+
+- `DEV_CLOUD_API_URL` must be an HTTPS origin;
+- the build emits that origin into the CSP `connect-src`;
+- the control plane accepts cross-origin browser requests only from exact origins configured in `DASHBOARD_ORIGINS`.
+
+This lets the console and stateful platform remain separately hosted without broad CORS or CSP wildcards.
+
+## Current non-goals
+
+The UI intentionally identifies, rather than fakes, unfinished capabilities:
+
+- multi-user IAM/SSO;
+- per-project Supabase instance orchestration;
+- isolated Git-to-image build runners;
+- private registry credential management;
+- production secret vault/KMS;
+- managed DNS/certificate lifecycle;
+- central logs/traces;
+- multi-node k3s scheduling;
+- global edge/WAF/DDoS infrastructure.
+
+## Legacy source
+
+Earlier app-builder Supabase functions and migrations remain in repository history/source for migration provenance. They are not loaded by the current DevCloud root browser bundle.
