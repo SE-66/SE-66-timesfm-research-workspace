@@ -6,6 +6,23 @@ const projects = select('#projects');
 
 tokenInput.value = sessionStorage.getItem('devcloud-token') || '';
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function safeHref(value) {
+  try {
+    const url = new URL(String(value), window.location.origin);
+    if (url.protocol === 'http:' || url.protocol === 'https:') return url.href;
+  } catch {}
+  return '#';
+}
+
 function headers() {
   return {
     'content-type': 'application/json',
@@ -35,8 +52,9 @@ async function loadServices() {
   try {
     const payload = await api('/api/services');
     services.innerHTML = Object.entries(payload).map(([key, value]) =>
-      '<a class="card" href="' + value + '" target="_blank" rel="noopener noreferrer">' +
-      '<strong>' + key.replaceAll('_', ' ') + '</strong><br><small>' + value + '</small></a>'
+      '<a class="card" href="' + safeHref(value) + '" target="_blank" rel="noopener noreferrer">' +
+      '<strong>' + escapeHtml(key.replaceAll('_', ' ')) + '</strong><br><small>' +
+      escapeHtml(value) + '</small></a>'
     ).join('');
   } catch (error) {
     services.textContent = error.message;
@@ -45,10 +63,11 @@ async function loadServices() {
 
 async function loadDeployments(element) {
   try {
-    const payload = await api('/api/projects/' + element.dataset.id + '/deployments');
+    const payload = await api('/api/projects/' + encodeURIComponent(element.dataset.id) + '/deployments');
     element.querySelector('.deployments').innerHTML = payload.deployments.map((deployment) =>
-      '<p><a href="' + deployment.url + '" target="_blank" rel="noopener noreferrer">' +
-      deployment.url + '</a> · ' + deployment.image + ' · ' + deployment.status + '</p>'
+      '<p><a href="' + safeHref(deployment.url) + '" target="_blank" rel="noopener noreferrer">' +
+      escapeHtml(deployment.url) + '</a> · ' + escapeHtml(deployment.image) +
+      ' · ' + escapeHtml(deployment.status) + '</p>'
     ).join('');
   } catch {
     element.querySelector('.deployments').textContent = 'Could not load deployments.';
@@ -61,7 +80,7 @@ async function deploy(element) {
   if (!image) return;
 
   try {
-    await api('/api/projects/' + element.dataset.id + '/deployments', {
+    await api('/api/projects/' + encodeURIComponent(element.dataset.id) + '/deployments', {
       method: 'POST',
       body: JSON.stringify({ image, container_port: containerPort })
     });
@@ -80,12 +99,12 @@ async function loadProjects() {
     }
 
     projects.innerHTML = payload.projects.map((project) =>
-      '<article class="project" data-id="' + project.id + '">' +
-      '<div class="heading"><div><strong>' + project.name + '</strong>' +
-      '<div><a href="' + project.repo_url + '" target="_blank" rel="noopener noreferrer">' +
-      project.repo_url + '</a></div></div>' +
-      '<span class="status">' + project.slug + '</span></div>' +
-      '<p>' + (project.description || '') + '</p>' +
+      '<article class="project" data-id="' + escapeHtml(project.id) + '">' +
+      '<div class="heading"><div><strong>' + escapeHtml(project.name) + '</strong>' +
+      '<div><a href="' + safeHref(project.repo_url) + '" target="_blank" rel="noopener noreferrer">' +
+      escapeHtml(project.repo_url) + '</a></div></div>' +
+      '<span class="status">' + escapeHtml(project.slug) + '</span></div>' +
+      '<p>' + escapeHtml(project.description || '') + '</p>' +
       '<div class="project-actions">' +
       '<input class="image" placeholder="public image, e.g. nginx:1.28-alpine">' +
       '<input class="port" type="number" value="80" min="1" max="65535">' +
