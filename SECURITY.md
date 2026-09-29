@@ -1,83 +1,90 @@
-# Security
+# DevCloud Security
 
-## Core trust model
+## Trust model
 
-The application has four important external boundaries:
+The current DevCloud milestone is a **single-admin, single-node** platform.
 
-- GitHub repository search;
-- Supabase Auth/Postgres/Edge Functions;
-- Hugging Face Inference Providers;
-- Cloudflare Workers Static Assets.
+It is not a production multi-tenant execution service yet.
 
-Generated source is untrusted until separately reviewed and executed in an isolated verification environment.
+The more detailed host/runtime threat model is documented in [platform/SECURITY.md](./platform/SECURITY.md).
 
-## Authentication and RLS
+## Browser console
 
-The browser uses Supabase Anonymous Sign-Ins. These users receive the `authenticated` database role, so every builder table has RLS enabled and ownership policies based on `(select auth.uid()) = user_id`.
+The Cloudflare-hosted console contains only public configuration:
 
-The unauthenticated `anon` role has no table privileges on builder tables.
+- the configured DevCloud API origin;
+- the source repository link;
+- first-party HTML/CSS/JavaScript.
 
-## API keys
+It does not embed:
 
-The browser receives only:
+- `CONTROL_PLANE_API_TOKEN`;
+- Gitea API credentials;
+- runtime-agent credentials;
+- Docker credentials/socket;
+- Supabase secret/service-role credentials.
 
-- `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY`
+The administrator enters `CONTROL_PLANE_API_TOKEN` manually. The console stores it in `sessionStorage`, so it is scoped to the current browser tab/session rather than persisted in local storage.
 
-These are public client configuration, not authorization boundaries.
+## Control-plane authentication
 
-Never expose a Supabase service-role/secret key in Cloudflare build variables or browser source.
+All control-plane routes except `GET /api/health` require the admin bearer token.
 
-## Hugging Face token handling
+This token is a bootstrap administrator credential, not an IAM system. It must be replaced by real account/session authorization before multi-user use.
 
-The Hugging Face token is BYOK and request-scoped:
+## Browser origin controls
 
-- input type is `password`;
-- the builder does not persist it in Supabase;
-- the generation function does not log the request body;
-- the function forwards it only to the fixed `router.huggingface.co` host;
-- the browser clears the input after the generation attempt.
+The Cloudflare build validates `DEV_CLOUD_API_URL` and requires HTTPS except for localhost development.
 
-Use a limited-scope token with Inference Providers permission.
+The generated CSP permits network access only to:
 
-## SSRF and network boundaries
+- the page's own origin;
+- the exact configured DevCloud API origin.
 
-`generate-app` does not accept an arbitrary model API base URL. It always calls the fixed Hugging Face router host, avoiding a user-controlled server-side request target.
+The control plane independently uses `DASHBOARD_ORIGINS` as an exact CORS allowlist. It does not use a credentialed wildcard origin.
 
-`research-open-source` always calls the fixed GitHub API host.
+## Gitea
 
-## Model output validation
+Public registration is disabled in the bootstrap configuration.
 
-The generation Edge Function validates:
+The Gitea control token is available only inside the control-plane service and is never sent to the browser.
 
-- JSON shape;
-- file count;
-- relative file paths;
-- parent-directory traversal;
-- backslashes/absolute paths;
-- per-file size;
-- total artifact size;
-- presence of `README.md` and `OPEN_SOURCE_COMPONENTS.md`.
+## Runtime agent
 
-This does not make generated code safe to execute. Package manifests and scripts remain untrusted.
+The runtime agent mounts `/var/run/docker.sock`. Docker-socket access is effectively host-administrator access.
 
-## Generated-code execution
+Current controls include:
 
-Do not execute generated project install/build/test scripts inside Supabase Edge Functions or the Cloudflare Worker. A future sandbox executor must implement resource limits, timeouts, network policy, secret isolation, and artifact/log capture.
+- internal Docker-network access only;
+- a separate runtime-agent bearer token;
+- no Traefik/public route;
+- validation of image names, ports, subdomains, and environment-variable keys;
+- deletion limited to containers carrying `devcloud.managed=true`.
 
-## Anonymous-auth abuse
+Do not expose the runtime agent directly to the internet.
 
-Public anonymous sign-ups can be automated. For a public launch, configure rate limits and an anti-abuse mechanism such as Cloudflare Turnstile/Supabase CAPTCHA. If CAPTCHA is enabled, the browser client must pass the CAPTCHA token to `signInAnonymously()`.
+## Workload isolation
 
-## Content Security Policy
+All managed application containers currently share the single-node Docker runtime/network.
 
-The Cloudflare `_headers` file restricts:
+Do not execute untrusted multi-tenant workloads in this configuration.
 
-- scripts to self + jsDelivr for pinned Supabase/JSZip browser distributions;
-- network connections to self + Supabase project domains;
-- framing by other origins;
-- camera, microphone, geolocation, payment, and USB APIs.
+Before multi-user deployment, move workload execution to the planned k3s adapter with namespaces, NetworkPolicies, quotas, restricted security contexts, image policy/scanning, and isolated build workers.
 
-## Dependency policy
+## Secrets
 
-Builder runtime dependencies are intentionally small. Significant dependencies/references are documented in `OPEN_SOURCE_COMPONENTS.md`. External code is not copied merely because it is public.
+The local `platform/.env` and generated Supabase state are gitignored.
+
+The current platform does not advertise a production secret vault. Container environment values remain visible to administrators with Docker inspection access.
+
+A KMS/Vault-backed secret adapter is required before production secret management is considered complete.
+
+## CI runners
+
+Gitea Actions is enabled, but no runner is registered automatically.
+
+Repository-controlled CI is arbitrary code execution. Do not give untrusted CI jobs the host Docker socket. Use isolated/rootless runners, microVMs, or a k3s sandbox.
+
+## Legacy builder source
+
+Old Supabase app-builder functions/migrations remain in source history but are not loaded by the current DevCloud browser bundle. Their former browser dependencies and CSP origins have been removed from the active Cloudflare build.
