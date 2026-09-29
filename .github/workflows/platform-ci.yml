@@ -3,6 +3,7 @@ name: Platform CI
 on:
   push:
     branches:
+      - main
       - feature/self-hosted-dev-cloud
     paths:
       - "platform/**"
