@@ -12,7 +12,9 @@ mkdirSync(dataDir, { recursive: true });
 
 const db = new DatabaseSync(join(dataDir, 'devcloud.sqlite'));
 db.exec(
+  'PRAGMA foreign_keys=ON;' +
   'PRAGMA journal_mode=WAL;' +
+  'PRAGMA busy_timeout=5000;' +
   'CREATE TABLE IF NOT EXISTS projects (' +
   'id TEXT PRIMARY KEY,' +
   'slug TEXT NOT NULL UNIQUE,' +
