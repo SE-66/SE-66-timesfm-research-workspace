@@ -33,6 +33,9 @@ jobs:
       - name: Syntax-check runtime agent
         working-directory: platform/runtime-agent
         run: node --check server.mjs
+      - name: Check bootstrap shell syntax
+        working-directory: platform
+        run: sh -n scripts/bootstrap.sh && sh -n scripts/bootstrap-supabase.sh
       - name: Render Docker Compose
         working-directory: platform
         env:
