@@ -1,6 +1,6 @@
 -- Open-source-first app builder control plane.
--- The previous research_entries table is intentionally left untouched to preserve
--- migration history; the new application does not use it.
+-- The app-builder schema is independent from the discarded TimesFM prototype.
+-- A later cleanup migration removes the legacy research_entries table on upgraded databases.
 
 create table if not exists public.builder_projects (
   id uuid primary key default gen_random_uuid(),

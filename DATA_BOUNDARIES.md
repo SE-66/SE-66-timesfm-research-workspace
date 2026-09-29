@@ -47,4 +47,4 @@ JSZip creates the ZIP entirely in the browser from the stored/generated file lis
 
 ## Legacy table
 
-The earlier `research_entries` TimesFM prototype table remains in the database only to preserve migration history. The current builder UI and Edge Functions do not read or write it.
+The legacy `research_entries` TimesFM prototype table has been removed from the live database. Its historical migration remains in source history, followed by a cleanup migration so fresh migration replays converge on the current app-builder schema.

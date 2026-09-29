@@ -24,7 +24,7 @@ Tables:
 
 Every table has RLS enabled and scopes rows to the current `auth.uid()`.
 
-The earlier `research_entries` table belongs to the discarded forecasting prototype. It is not used by the current app and remains only to preserve migration history/data unless explicitly removed later.
+The legacy `research_entries` table from the discarded forecasting prototype is removed by `20260929083021_remove_legacy_timesfm_table.sql`. Historical migrations remain in the repository so the migration chain matches the live database.
 
 ## Edge Functions
 
