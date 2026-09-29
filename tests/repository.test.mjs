@@ -5,67 +5,64 @@ import { readFile } from 'node:fs/promises';
 const html = await readFile(new URL('../src/index.html', import.meta.url), 'utf8');
 const js = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
 const build = await readFile(new URL('../scripts/build.mjs', import.meta.url), 'utf8');
-const migration = await readFile(new URL('../supabase/migrations/20260929080000_create_open_source_app_builder_core.sql', import.meta.url), 'utf8');
-const researchFn = await readFile(new URL('../supabase/functions/research-open-source/index.ts', import.meta.url), 'utf8');
-const generateFn = await readFile(new URL('../supabase/functions/generate-app/index.ts', import.meta.url), 'utf8');
 const headers = await readFile(new URL('../public/_headers', import.meta.url), 'utf8');
 const wrangler = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+const controlPlane = await readFile(new URL('../platform/control-plane/src/server.mjs', import.meta.url), 'utf8');
+const runtime = await readFile(new URL('../platform/runtime-agent/server.mjs', import.meta.url), 'utf8');
+const compose = await readFile(new URL('../platform/docker-compose.yml', import.meta.url), 'utf8');
 
-test('product is the open-source-first app builder', () => {
-  assert.match(html, /Open Source App Builder/);
-  assert.match(html, /Create project & research open source/);
-  assert.match(html, /Generate source bundle/);
-  assert.doesNotMatch(html, /TimesFM Research Workspace/);
+test('deployed product is the DevCloud control console', () => {
+  assert.match(html, /DevCloud/);
+  assert.match(html, /SELF-HOSTED DEVELOPER CLOUD/);
+  assert.match(html, /Create a project and private Git repository/);
+  assert.match(html, /Projects and deployments/);
+  assert.doesNotMatch(html, /Open Source App Builder/);
 });
 
-test('the full engineering pipeline is visible', () => {
-  for (const stage of ['inspect','research','license','understand','integrate','build','test','verify']) {
-    assert.match(html, new RegExp(`data-stage="${stage}"`));
-  }
+test('browser console uses the real control-plane API surface', () => {
+  assert.match(js, /\/api\/health/);
+  assert.match(js, /\/api\/services/);
+  assert.match(js, /\/api\/projects/);
+  assert.match(js, /\/deployments/);
+  assert.match(js, /method: 'DELETE'/);
+  assert.match(js, /sessionStorage/);
+  assert.match(js, /CONTROL_PLANE_API_TOKEN/);
+  assert.doesNotMatch(js, /supabase\.createClient/);
 });
 
-test('browser workflow persists projects, research, decisions, and artifacts', () => {
-  assert.match(js, /from\('builder_projects'\)/);
-  assert.match(js, /from\('oss_candidates'\)/);
-  assert.match(js, /from\('integration_decisions'\)/);
-  assert.match(js, /from\('builder_artifacts'\)/);
-  assert.match(js, /signInAnonymously/);
+test('build exposes only a public DevCloud API origin', () => {
+  assert.match(build, /__DEV_CLOUD_CONFIG__/);
+  assert.match(build, /DEV_CLOUD_API_URL/);
+  assert.match(build, /parsed\.protocol !== 'https:'/);
+  assert.match(build, /__DEV_CLOUD_CONNECT_SRC__/);
+  assert.doesNotMatch(build, /SUPABASE_PUBLISHABLE_KEY/);
 });
 
-test('research function performs real GitHub discovery with license handling', () => {
-  assert.match(researchFn, /api\.github\.com\/search\/repositories/);
-  assert.match(researchFn, /classifyLicense/);
-  assert.match(researchFn, /permissive/);
-  assert.match(researchFn, /reciprocal/);
-  assert.match(researchFn, /restricted/);
-});
-
-test('generation function uses Hugging Face and refuses fake verification', () => {
-  assert.match(generateFn, /router\.huggingface\.co\/v1\/chat\/completions/);
-  assert.match(generateFn, /OPEN_SOURCE_COMPONENTS\.md/);
-  assert.match(generateFn, /verification_state: "unverified"/);
-  assert.match(generateFn, /maximum 35 files/i);
-});
-
-test('builder schema uses ownership RLS', () => {
-  for (const table of ['builder_projects','build_runs','oss_candidates','integration_decisions','builder_artifacts']) {
-    assert.match(migration, new RegExp(`alter table public\\.${table} enable row level security`));
-  }
-  assert.match(migration, /auth\.uid\(\)\) = user_id/);
-  assert.match(migration, /revoke all on table public\.builder_projects from anon/);
-});
-
-test('build embeds only public Supabase configuration', () => {
-  assert.match(build, /__OPEN_SOURCE_APP_BUILDER_CONFIG__/);
-  assert.match(build, /SUPABASE_URL/);
-  assert.match(build, /SUPABASE_PUBLISHABLE_KEY/);
-  assert.match(build, /service\[_-\]\?role/);
-});
-
-test('Cloudflare deploys dist as Worker static assets with constrained CSP', () => {
-  assert.match(wrangler, /"name": "open-source-app-builder"/);
+test('Cloudflare deploy remains static assets with a constrained CSP', () => {
   assert.match(wrangler, /"directory": "\.\/dist"/);
-  assert.match(headers, /script-src 'self' https:\/\/cdn\.jsdelivr\.net/);
-  assert.match(headers, /connect-src 'self' https:\/\/\*\.supabase\.co/);
-  assert.doesNotMatch(headers, /hari31416-ts-foundation-lab/);
+  assert.match(headers, /script-src 'self'/);
+  assert.match(headers, /connect-src 'self'__DEV_CLOUD_CONNECT_SRC__/);
+  assert.doesNotMatch(headers, /cdn\.jsdelivr\.net/);
+  assert.doesNotMatch(headers, /\*\.supabase\.co/);
+});
+
+test('control plane creates repositories and delegates runtime deployment', () => {
+  assert.match(controlPlane, /\/api\/v1\/user\/repos/);
+  assert.match(controlPlane, /\/v1\/deployments/);
+  assert.match(controlPlane, /CREATE TABLE IF NOT EXISTS projects/);
+  assert.match(controlPlane, /CREATE TABLE IF NOT EXISTS deployments/);
+});
+
+test('runtime adapter validates and labels managed containers', () => {
+  assert.match(runtime, /devcloud\.managed/);
+  assert.match(runtime, /invalid deployment request/);
+  assert.match(runtime, /NetworkMode/);
+  assert.match(runtime, /traefik\.http\.routers/);
+});
+
+test('compose stack pins the open-source service layer', () => {
+  assert.match(compose, /gitea\/gitea:1\.27\.3/);
+  assert.match(compose, /traefik:v3\.7\.13/);
+  assert.match(compose, /runtime-agent/);
+  assert.match(compose, /control-plane/);
 });
