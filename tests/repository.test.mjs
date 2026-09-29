@@ -66,3 +66,9 @@ test('compose stack pins the open-source service layer', () => {
   assert.match(compose, /runtime-agent/);
   assert.match(compose, /control-plane/);
 });
+
+test('control plane supports the Cloudflare console through an explicit browser CORS allowlist', () => {
+  assert.match(controlPlane, /DASHBOARD_ORIGINS/);
+  assert.match(controlPlane, /access-control-allow-origin/);
+  assert.match(controlPlane, /origin not allowed/);
+});
