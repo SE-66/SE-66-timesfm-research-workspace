@@ -5,7 +5,7 @@ A standalone research interface for zero-shot time-series forecasting with Googl
 The repository is prepared for this deployment architecture:
 
 - **GitHub** — source repository and pull-request workflow.
-- **Cloudflare Pages** — static web deployment from the GitHub repository.
+- **Cloudflare Workers Static Assets** — Git-connected static web deployment.
 - **Supabase** — optional app-owned research-log metadata with anonymous authentication and Row Level Security (RLS).
 - **Hugging Face Space** — external TimesFM execution and CSV upload boundary.
 
@@ -39,46 +39,49 @@ The production build is written to `dist/`.
 
 ## Supabase setup
 
-Supabase is optional: the core TimesFM workspace remains usable without environment variables. To enable the research log:
+The live Supabase project is `TimesFM Research Workspace`.
 
-1. Create or select a Supabase project.
-2. Enable **Anonymous Sign-Ins** in Auth settings.
-3. Apply `supabase/migrations/202609290001_create_research_entries.sql`.
-4. For local builds, set the two public build variables before `npm run build` or `npm run dev`:
+Project URL:
+
+`https://vuwxwbdptspvbxptpmub.supabase.co`
+
+Anonymous Sign-Ins are enabled, and the database migrations in `supabase/migrations/` document the live schema/RLS setup.
+
+For Cloudflare or local builds, provide:
 
 ```bash
-SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co \
+SUPABASE_URL=https://vuwxwbdptspvbxptpmub.supabase.co \
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_... \
 npm run build
 ```
 
-Only the publishable browser key belongs in the generated client configuration. Never use a service-role key here.
+Only the publishable browser key belongs in generated client configuration. Never use a service-role key.
 
-The migration enables RLS so each anonymous Supabase user can select, insert, and delete only their own rows. Anonymous sessions are persisted by the Supabase client in browser storage; clearing browser data or changing devices loses access to that anonymous identity.
+The RLS policies ensure each anonymous Supabase user can select, insert, and delete only their own research-log rows. Anonymous sessions are persisted by the Supabase client in browser storage; clearing browser data or changing devices loses access to that anonymous identity.
 
 See [docs/SUPABASE.md](./docs/SUPABASE.md) and [DATA_BOUNDARIES.md](./DATA_BOUNDARIES.md).
 
-## Cloudflare Pages deployment from GitHub
+## Cloudflare Workers deployment from GitHub
 
-The repository contains `wrangler.jsonc`, `public/_headers`, and a dependency-free production `npm run build` script.
+The repository contains `wrangler.jsonc`, `public/_headers`, and the production build script.
 
-Recommended Git integration settings:
+Use these Cloudflare Workers Build settings:
 
 - Production branch: `main`
 - Build command: `npm run build`
-- Build output directory: `dist`
-- Node version: 22
-- Production/preview environment variables:
-  - `SUPABASE_URL` (only if Supabase is enabled)
-  - `SUPABASE_PUBLISHABLE_KEY` (only if Supabase is enabled)
+- Deploy command: `npx wrangler deploy`
+- Root directory: blank / repository root
+- Production/preview build variables:
+  - `SUPABASE_URL`
+  - `SUPABASE_PUBLISHABLE_KEY`
+
+`wrangler.jsonc` deploys `./dist` as Workers Static Assets.
 
 See [docs/CLOUDFLARE.md](./docs/CLOUDFLARE.md).
 
-GitHub repository bootstrap steps are in [docs/GITHUB.md](./docs/GITHUB.md).
-
 ## GitHub workflow
 
-`.github/workflows/ci.yml` runs `npm ci` and `npm run check` on pull requests and pushes to `main`. Cloudflare Pages Git integration can independently create deployment previews for repository branches/PRs.
+`.github/workflows/ci.yml` runs `npm ci` and `npm run check` on pull requests and pushes to `main`.
 
 ## External execution boundary
 
