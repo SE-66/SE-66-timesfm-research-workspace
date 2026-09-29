@@ -36,7 +36,12 @@ if (!migration.includes('auth.uid()')) throw new Error('Supabase policies must s
 if (!headers.includes('Content-Security-Policy')) throw new Error('Missing Cloudflare security headers.');
 if (!headers.includes('https://cdn.jsdelivr.net')) throw new Error('CSP must allow the pinned Supabase client CDN.');
 if (!headers.includes('https://*.supabase.co')) throw new Error('CSP must allow configured Supabase HTTPS endpoints.');
-if (!wrangler.includes('pages_build_output_dir')) throw new Error('Missing Cloudflare Pages output configuration.');
+if (!wrangler.includes('"assets"') || !wrangler.includes('"directory": "./dist"')) {
+  throw new Error('Missing Cloudflare Workers static assets configuration.');
+}
+if (wrangler.includes('pages_build_output_dir')) {
+  throw new Error('Pages-only configuration must not be mixed into Workers Builds.');
+}
 if (!css.includes('@media (max-width: 620px)')) throw new Error('Missing mobile breakpoint.');
 if (/service[_-]?role/i.test(html + js)) throw new Error('Service-role credentials must not appear in browser source.');
 
