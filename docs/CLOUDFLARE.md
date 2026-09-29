@@ -1,52 +1,55 @@
-# Cloudflare Pages Deployment
+# Cloudflare Workers Deployment
 
-## Recommended path: GitHub integration
+This repository is configured for the current **Cloudflare Workers Builds + Static Assets** Git workflow.
 
-1. Push this repository to GitHub.
-2. In Cloudflare, open **Workers & Pages** and create a **Pages** application from the Git repository.
-3. Select `SE-66/SE-66-timesfm-research-workspace`.
-4. Configure:
-   - Production branch: `main`
-   - Build command: `npm run build`
-   - Build output directory: `dist`
-   - Root directory: repository root / blank
-   - **Deploy command: leave blank** for Git-integrated Pages
-5. Set Node.js 22 if you want the build runtime pinned to the same version used in CI.
-6. Add these build variables for Production and Preview:
-   - `SUPABASE_URL`
-   - `SUPABASE_PUBLISHABLE_KEY`
-7. Save and redeploy.
+## Git build settings
 
-Cloudflare Pages Git integration uploads the configured build output after a successful build. Do **not** set `npx wrangler deploy` as the deploy command: that is the Workers deploy path and will fail against this Pages configuration.
+Connect `SE-66/SE-66-timesfm-research-workspace` and use:
 
-If you intentionally switch to a manual/Direct Upload workflow instead of Git integration, the Pages-specific command is:
+- Production branch: `main`
+- Build command: `npm run build`
+- Deploy command: `npx wrangler deploy`
+- Root directory: repository root / blank
 
-```bash
-npx wrangler pages deploy dist
+The build writes the site to `dist/`. `wrangler.jsonc` then tells Workers Static Assets to deploy that directory:
+
+```json
+{
+  "name": "timesfm-research-workspace",
+  "compatibility_date": "2026-09-29",
+  "assets": {
+    "directory": "./dist"
+  }
+}
 ```
 
-Do not combine manual Wrangler deployment with the normal Git-integrated deployment path unless you intentionally disable automatic Git deployments.
+Do not use `wrangler pages deploy` for this Cloudflare Worker project.
 
-## Supabase build configuration
+## Supabase build variables
 
-The production build reports whether Supabase was enabled:
+Add these as **build-time environment variables** for the production trigger (and preview trigger if you want Supabase enabled in previews):
 
-- `Built static site to dist/ (Supabase enabled).` means both public build variables were present.
-- `Built static site to dist/ (Supabase disabled).` means one or both Cloudflare build variables were not provided.
+- `SUPABASE_URL=https://vuwxwbdptspvbxptpmub.supabase.co`
+- `SUPABASE_PUBLISHABLE_KEY=sb_publishable_...`
 
-The required values are browser-visible public configuration. Never use a Supabase service-role or secret key in this frontend.
+The production build reports whether these were present:
 
-## Repository configuration
+- `Built static site to dist/ (Supabase enabled).` — both variables were provided.
+- `Built static site to dist/ (Supabase disabled).` — one or both were absent.
 
-`wrangler.jsonc` records the Pages project name, `./dist` output directory, and compatibility date.
+Only use the Supabase publishable browser key. Never put a service-role or secret key in this frontend.
 
-`public/_headers` is copied into `dist/` and applies the production security headers for the static Pages site.
+## Static response security
+
+`public/_headers` is copied into `dist/`. Cloudflare Workers Static Assets parses the `_headers` file and applies its CSP and other response-security headers to static asset responses.
 
 ## Verification
 
-Before pushing:
+Before deployment:
 
 ```bash
 npm ci
 npm run check
 ```
+
+A successful Git deployment runs `npm run build` and then `npx wrangler deploy`, which uploads `./dist` through the Workers Static Assets configuration.
