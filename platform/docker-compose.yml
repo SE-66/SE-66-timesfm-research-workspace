@@ -1,0 +1,116 @@
+name: devcloud
+
+services:
+  traefik:
+    image: traefik:v3.7.13
+    container_name: devcloud-traefik
+    restart: unless-stopped
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+    ports:
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [devcloud]
+
+  gitea:
+    image: gitea/gitea:1.27.3
+    container_name: devcloud-gitea
+    restart: unless-stopped
+    environment:
+      USER_UID: "1000"
+      USER_GID: "1000"
+      GITEA__database__DB_TYPE: sqlite3
+      GITEA__server__DOMAIN: git.${BASE_DOMAIN}
+      GITEA__server__ROOT_URL: ${PUBLIC_SCHEME}://git.${BASE_DOMAIN}/
+      GITEA__server__SSH_DOMAIN: git.${BASE_DOMAIN}
+      GITEA__server__SSH_PORT: ${GITEA_SSH_PORT}
+      GITEA__server__START_SSH_SERVER: "true"
+      GITEA__service__DISABLE_REGISTRATION: "true"
+      GITEA__actions__ENABLED: "true"
+      GITEA__security__INSTALL_LOCK: "true"
+    volumes:
+      - gitea-data:/data
+    ports:
+      - "${GITEA_SSH_PORT}:22"
+    labels:
+      - traefik.enable=true
+      - 'traefik.http.routers.gitea.rule=Host(`git.${BASE_DOMAIN}`)'
+      - traefik.http.routers.gitea.entrypoints=web
+      - traefik.http.services.gitea.loadbalancer.server.port=3000
+    networks: [devcloud]
+
+  control-plane:
+    build:
+      context: ./control-plane
+    container_name: devcloud-control-plane
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      DATA_DIR: /data
+      CONTROL_PLANE_API_TOKEN: ${CONTROL_PLANE_API_TOKEN}
+      GITEA_BASE_URL: http://gitea:3000
+      GITEA_PUBLIC_URL: ${PUBLIC_SCHEME}://git.${BASE_DOMAIN}
+      GITEA_TOKEN: ${GITEA_TOKEN}
+      GITEA_OWNER: ${GITEA_OWNER}
+      RUNTIME_AGENT_URL: http://runtime-agent:8090
+      RUNTIME_AGENT_TOKEN: ${RUNTIME_AGENT_TOKEN}
+      BASE_DOMAIN: ${BASE_DOMAIN}
+      PUBLIC_SCHEME: ${PUBLIC_SCHEME}
+      SUPABASE_API_URL: ${PUBLIC_SCHEME}://${SUPABASE_API_HOST}
+      SUPABASE_STUDIO_URL: ${PUBLIC_SCHEME}://${SUPABASE_STUDIO_HOST}
+    volumes:
+      - control-plane-data:/data
+    labels:
+      - traefik.enable=true
+      - 'traefik.http.routers.control.rule=Host(`${BASE_DOMAIN}`) && PathPrefix(`/api`)'
+      - traefik.http.routers.control.entrypoints=web
+      - traefik.http.services.control.loadbalancer.server.port=8080
+    depends_on: [gitea, runtime-agent]
+    networks: [devcloud]
+
+  runtime-agent:
+    build:
+      context: ./runtime-agent
+    container_name: devcloud-runtime-agent
+    restart: unless-stopped
+    environment:
+      PORT: "8090"
+      RUNTIME_AGENT_TOKEN: ${RUNTIME_AGENT_TOKEN}
+      DOCKER_SOCKET: /var/run/docker.sock
+      DOCKER_API_VERSION: v1.47
+      RUNTIME_NETWORK: devcloud
+      BASE_DOMAIN: ${BASE_DOMAIN}
+      PUBLIC_SCHEME: ${PUBLIC_SCHEME}
+      TRAEFIK_CERTRESOLVER: ${TRAEFIK_CERTRESOLVER}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [devcloud]
+
+  dashboard:
+    image: nginx:1.28-alpine
+    container_name: devcloud-dashboard
+    restart: unless-stopped
+    volumes:
+      - ./dashboard:/usr/share/nginx/html:ro
+    labels:
+      - traefik.enable=true
+      - 'traefik.http.routers.dashboard.rule=Host(`${BASE_DOMAIN}`)'
+      - traefik.http.routers.dashboard.entrypoints=web
+      - traefik.http.routers.dashboard.priority=1
+      - traefik.http.services.dashboard.loadbalancer.server.port=80
+    networks: [devcloud]
+
+networks:
+  devcloud:
+    name: devcloud
+
+volumes:
+  gitea-data:
+  control-plane-data:

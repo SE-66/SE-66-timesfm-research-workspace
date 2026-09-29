@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DevCloud</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header>
+  <div>
+    <p class="eyebrow">SELF-HOSTED DEVELOPER CLOUD</p>
+    <h1>DevCloud</h1>
+    <p>Code · Database · Auth · Storage · Deployments · Domains · Logs</p>
+  </div>
+  <span id="health">checking…</span>
+</header>
+<main>
+  <section class="panel">
+    <h2>Control-plane access</h2>
+    <div class="row">
+      <input id="token" type="password" placeholder="CONTROL_PLANE_API_TOKEN">
+      <button id="save-token">Use token</button>
+    </div>
+    <p class="muted">The token is kept in sessionStorage only.</p>
+  </section>
+
+  <section class="panel">
+    <div class="heading"><h2>Services</h2><button id="refresh-services">Refresh</button></div>
+    <div id="services" class="cards"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Create project</h2>
+    <form id="project-form">
+      <input id="project-name" required placeholder="Project name">
+      <input id="project-slug" required pattern="[a-z0-9-]+" placeholder="project-slug">
+      <textarea id="project-description" placeholder="Description"></textarea>
+      <button type="submit">Create project + Git repository</button>
+    </form>
+    <p id="project-message"></p>
+  </section>
+
+  <section class="panel">
+    <div class="heading"><h2>Projects</h2><button id="refresh-projects">Refresh</button></div>
+    <div id="projects"></div>
+  </section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>
