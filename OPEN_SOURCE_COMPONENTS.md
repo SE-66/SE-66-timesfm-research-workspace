@@ -38,23 +38,23 @@ The official repository distinguishes its Apache-2.0 source code from the TimesF
 - Version: 2.117.2 (pinned).
 - License: MIT.
 - Purpose: Supabase Anonymous Auth and Data API client.
-- Integration: official browser/UMD distribution loaded from jsDelivr, a distribution method documented by Supabase.
+- Integration: official browser/UMD distribution loaded from jsDelivr.
 - Modifications: none.
 - Security boundary: only project URL/publishable key are exposed; privileged keys are prohibited in browser output.
 
-## Cloudflare Pages / Wrangler
+## Cloudflare Workers / Wrangler
 
-- Documentation: https://developers.cloudflare.com/pages/
+- Documentation: https://developers.cloudflare.com/workers/static-assets/
 - Wrangler project: https://github.com/cloudflare/workers-sdk
-- Optional CLI version in repository command: 4.142.0.
+- CLI version pinned in repository command: 4.143.0.
 - License: Wrangler npm metadata identifies `MIT OR Apache-2.0` at review time.
-- Purpose: Git-integrated static hosting; Wrangler is optional for explicit CLI deployment.
-- Integration: `wrangler.jsonc`, `public/_headers`, Cloudflare dashboard Git integration, and an optional pinned `npx` command.
+- Purpose: Git-integrated static hosting through Workers Static Assets.
+- Integration: `wrangler.jsonc` with `assets.directory = ./dist`, `public/_headers`, Cloudflare Workers Builds Git integration, and `npx wrangler deploy`.
 - Code copied: none.
 
 ## Runtime/build dependencies
 
-The local repository build scripts use Node.js standard-library modules only. The Supabase browser SDK is loaded at runtime from its pinned official CDN distribution. This keeps Cloudflare/GitHub builds free of npm application dependencies while retaining the maintained Supabase client instead of reimplementing Auth/Data APIs.
+The local repository build scripts use Node.js standard-library modules only. The Supabase browser SDK is loaded at runtime from its pinned CDN distribution. This keeps Cloudflare/GitHub builds free of npm application dependencies while retaining the maintained Supabase client instead of reimplementing Auth/Data APIs.
 
 ## Project source license
 
