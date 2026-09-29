@@ -11,7 +11,7 @@ const dataDir = env.DATA_DIR || '/data';
 const dashboardOrigins = new Set(
   String(env.DASHBOARD_ORIGINS || '')
     .split(',')
-    .map((value) => value.trim().replace(/\\\/+$/, ''))
+    .map((value) => value.trim().replace(/\/+$/, ''))
     .filter(Boolean)
 );
 mkdirSync(dataDir, { recursive: true });
