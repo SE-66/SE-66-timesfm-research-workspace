@@ -1,192 +1,32 @@
-const config = globalThis.__TIMESFM_RESEARCH_CONFIG__ ?? {};
-const supabaseUrl = config.supabaseUrl?.trim();
-const supabasePublishableKey = config.supabasePublishableKey?.trim();
-
-const stateBadge = document.querySelector('#supabase-state');
-const form = document.querySelector('#research-log-form');
-const saveButton = document.querySelector('#save-entry');
-const refreshButton = document.querySelector('#refresh-entries');
-const formMessage = document.querySelector('#form-message');
-const entriesRoot = document.querySelector('#research-entries');
-
-let client = null;
-
-function setState(label, state) {
-  stateBadge.textContent = label;
-  stateBadge.dataset.state = state;
-}
-
-function setMessage(message, isError = false) {
-  formMessage.textContent = message;
-  formMessage.dataset.error = String(isError);
-}
-
-function setControlsEnabled(enabled) {
-  saveButton.disabled = !enabled;
-  refreshButton.disabled = !enabled;
-}
-
-function formatDate(value) {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(new Date(value));
-  } catch {
-    return value;
-  }
-}
-
-function renderEntries(entries) {
-  entriesRoot.replaceChildren();
-
-  if (!entries.length) {
-    const empty = document.createElement('p');
-    empty.className = 'empty-state';
-    empty.textContent = 'No research entries saved for this anonymous workspace yet.';
-    entriesRoot.append(empty);
-    return;
-  }
-
-  for (const entry of entries) {
-    const article = document.createElement('article');
-    article.className = 'research-entry';
-
-    const head = document.createElement('div');
-    head.className = 'entry-head';
-
-    const label = document.createElement('div');
-    const scenario = document.createElement('span');
-    scenario.className = 'scenario-chip';
-    scenario.textContent = entry.scenario;
-    const title = document.createElement('h4');
-    title.textContent = entry.title;
-    label.append(scenario, title);
-
-    const deleteButton = document.createElement('button');
-    deleteButton.type = 'button';
-    deleteButton.className = 'delete-button';
-    deleteButton.textContent = 'Delete';
-    deleteButton.addEventListener('click', () => deleteEntry(entry.id));
-
-    head.append(label, deleteButton);
-
-    const meta = document.createElement('p');
-    meta.className = 'entry-meta';
-    meta.textContent = [entry.dataset_label || 'No dataset label', formatDate(entry.created_at)].join(' · ');
-
-    const notes = document.createElement('p');
-    notes.className = 'entry-notes';
-    notes.textContent = entry.notes || 'No notes.';
-
-    article.append(head, meta, notes);
-    entriesRoot.append(article);
-  }
-}
-
-async function ensureAnonymousSession() {
-  const { data: sessionData, error: sessionError } = await client.auth.getSession();
-  if (sessionError) throw sessionError;
-  if (sessionData.session) return sessionData.session;
-
-  const { data, error } = await client.auth.signInAnonymously();
-  if (error) throw error;
-  return data.session;
-}
-
-async function loadEntries() {
-  entriesRoot.innerHTML = '<p class="empty-state">Loading research entries…</p>';
-  const { data, error } = await client
-    .from('research_entries')
-    .select('id,title,scenario,dataset_label,notes,created_at')
-    .order('created_at', { ascending: false })
-    .limit(50);
-
-  if (error) throw error;
-  renderEntries(data ?? []);
-}
-
-async function deleteEntry(id) {
-  setMessage('Deleting…');
-  const { error } = await client.from('research_entries').delete().eq('id', id);
-  if (error) {
-    setMessage(error.message, true);
-    return;
-  }
-  setMessage('Entry deleted.');
-  await loadEntries();
-}
-
-async function saveEntry(event) {
-  event.preventDefault();
-  setMessage('Saving…');
-  saveButton.disabled = true;
-
-  const payload = {
-    title: document.querySelector('#entry-title').value.trim(),
-    scenario: document.querySelector('#entry-scenario').value,
-    dataset_label: document.querySelector('#entry-dataset').value.trim(),
-    notes: document.querySelector('#entry-notes').value.trim(),
-  };
-
-  const { error } = await client.from('research_entries').insert(payload);
-  if (error) {
-    setMessage(error.message, true);
-    saveButton.disabled = false;
-    return;
-  }
-
-  form.reset();
-  setMessage('Research entry saved.');
-  saveButton.disabled = false;
-  await loadEntries();
-}
-
-async function initSupabase() {
-  if (!supabaseUrl || !supabasePublishableKey) {
-    setState('Supabase not configured', 'off');
-    setControlsEnabled(false);
-    return;
-  }
-
-  if (!globalThis.supabase?.createClient) {
-    setState('Supabase client unavailable', 'error');
-    setControlsEnabled(false);
-    entriesRoot.innerHTML = '<p class="empty-state">The pinned Supabase client could not be loaded. Check network/CSP availability for cdn.jsdelivr.net.</p>';
-    return;
-  }
-
-  client = globalThis.supabase.createClient(supabaseUrl, supabasePublishableKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: false,
-    },
-  });
-
-  try {
-    setState('Creating anonymous workspace…', 'loading');
-    await ensureAnonymousSession();
-    setState('Supabase connected', 'ready');
-    setControlsEnabled(true);
-    await loadEntries();
-  } catch (error) {
-    setState('Supabase setup required', 'error');
-    setControlsEnabled(false);
-    entriesRoot.innerHTML = '<p class="empty-state">Supabase could not initialize. Apply the migration, enable anonymous sign-ins, and verify the public build variables.</p>';
-    setMessage(error instanceof Error ? error.message : 'Supabase initialization failed.', true);
-  }
-}
-
-form.addEventListener('submit', saveEntry);
-refreshButton.addEventListener('click', async () => {
-  setMessage('Refreshing…');
-  try {
-    await loadEntries();
-    setMessage('Research entries refreshed.');
-  } catch (error) {
-    setMessage(error instanceof Error ? error.message : 'Refresh failed.', true);
-  }
-});
-
-initSupabase();
+const cfg=globalThis.__OPEN_SOURCE_APP_BUILDER_CONFIG__??{};
+const supabaseUrl=cfg.supabaseUrl?.trim(),supabasePublishableKey=cfg.supabasePublishableKey?.trim();
+const $=s=>document.querySelector(s), ui={
+ state:$('#supabase-state'),form:$('#project-form'),name:$('#project-name'),brief:$('#project-brief'),stack:$('#stack-preferences'),target:$('#deployment-target'),query:$('#oss-query'),research:$('#research-button'),projectMsg:$('#project-message'),pipeline:$('#pipeline'),run:$('#run-label'),researchSection:$('#research-section'),caveat:$('#research-caveat'),candidates:$('#candidate-list'),refreshResearch:$('#refresh-research'),save:$('#save-decisions'),decisionMsg:$('#decision-message'),custom:$('#custom-implementation'),customWhy:$('#custom-rationale'),generation:$('#generation-section'),token:$('#hf-token'),model:$('#hf-model'),generate:$('#generate-button'),generationMsg:$('#generation-message'),artifact:$('#artifact-section'),verification:$('#verification-badge'),summary:$('#artifact-summary'),files:$('#artifact-files'),commands:$('#verification-commands'),limits:$('#artifact-limitations'),zip:$('#download-zip'),json:$('#download-json'),refreshProjects:$('#refresh-projects'),projects:$('#recent-projects')
+};
+const stages=['inspect','research','license','understand','integrate','build','test','verify'];
+const stop=new Set('the and for from with this that app application build create using want should must users user web site system have has are was were into your'.split(' '));
+let client,project,run,candidates=[],decisions=[],artifact;
+const msg=(el,t,e=false)=>{el.textContent=t;el.dataset.error=String(e)}, busy=(b,on,t='Working…')=>{b.dataset.idle??=b.textContent;b.disabled=on;b.textContent=on?t:b.dataset.idle};
+const pipeline=(stage,blocked=false)=>{const a=stages.indexOf(stage);ui.pipeline.querySelectorAll('li').forEach(li=>{const s=li.dataset.stage,i=stages.indexOf(s);li.dataset.state=blocked&&(s==='test'||s==='verify')?'blocked':i<a?'done':i===a?'active':'pending'})};
+const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const date=v=>{try{return v?new Intl.DateTimeFormat(undefined,{dateStyle:'medium'}).format(new Date(v)):'Unknown'}catch{return String(v||'Unknown')}};
+const stars=n=>new Intl.NumberFormat(undefined,{notation:Number(n)>=1000?'compact':'standard',maximumFractionDigits:1}).format(Number(n)||0);
+const slug=v=>String(v).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'generated-app';
+const derivedQuery=()=>[...new Set(`${ui.name.value} ${ui.brief.value}`.toLowerCase().replace(/[^a-z0-9+#.-]+/g,' ').split(/\s+/).filter(x=>x.length>2&&!stop.has(x)))].slice(0,8).join(' ');
+function download(name,blob){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.append(a);a.click();a.remove();URL.revokeObjectURL(u)}
+async function session(){const s=await client.auth.getSession();if(s.error)throw s.error;if(s.data.session)return s.data.session;const r=await client.auth.signInAnonymously();if(r.error)throw r.error;return r.data.session}
+async function recent(){if(!client)return;ui.projects.innerHTML='<p class="empty-state">Loading projects…</p>';const r=await client.from('builder_projects').select('id,name,status,deployment_target,created_at').order('created_at',{ascending:false}).limit(10);if(r.error)throw r.error;ui.projects.innerHTML=r.data?.length?r.data.map(p=>`<article class="recent-project"><div><strong>${esc(p.name)}</strong><span class="mini-status">${esc(p.status.replaceAll('_',' '))}</span></div><small>${esc(p.deployment_target)} · ${esc(date(p.created_at))}</small></article>`).join(''):'<p class="empty-state">No projects yet. Create one from the build brief.</p>'}
+const defaultWhy=c=>c.license_state==='permissive'&&c.maintenance_state==='active'?'Evaluate as a reusable dependency/component after reviewing LICENSE/NOTICE, documentation, dependencies, compatibility, and security posture.':'Use as architectural reference only unless deeper license, compatibility, and security review establishes direct reuse is appropriate.';
+function renderCandidates(){if(!candidates.length){ui.candidates.innerHTML='<p class="empty-state">No repositories returned. Refine the search or record a custom implementation decision.</p>';return}ui.candidates.innerHTML=candidates.map(c=>{const url=String(c.repository_url||'').startsWith('https://github.com/')?c.repository_url:'#';return `<article class="candidate-card" data-candidate-id="${esc(c.id)}"><div class="candidate-top"><label class="candidate-select"><input class="candidate-checkbox" type="checkbox"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(c.repository_full_name)}</a></label><div class="candidate-badges"><span class="badge" data-tone="${esc(c.license_state)}">${esc(c.license_spdx)} · ${esc(c.license_state)}</span><span class="badge" data-tone="${esc(c.maintenance_state)}">${esc(c.maintenance_state)}</span></div></div><p class="candidate-description">${esc(c.description||'No repository description.')}</p><p class="candidate-meta">${esc(stars(c.stars))} stars · ${esc(c.primary_language||'Language unknown')} · pushed ${esc(date(c.pushed_at))}</p><p class="candidate-notes">${esc(c.notes)}</p><div class="candidate-decision-grid"><label>Decision<select class="candidate-decision"><option value="reuse">Reuse</option><option value="reference" selected>Reference only</option><option value="reject">Reject</option></select></label><label>Integration method<select class="candidate-method">${['dependency','api','component','adapter','fork','reference','custom'].map(v=>`<option ${v==='reference'?'selected':''}>${v}</option>`).join('')}</select></label><label class="rationale-label">Rationale<textarea class="candidate-rationale" rows="3" maxlength="4000">${esc(defaultWhy(c))}</textarea></label></div></article>`}).join('')}
+async function newRun(){const r=await client.from('build_runs').insert({project_id:project.id,status:'researching',stage:'research'}).select('id,project_id,status,stage,started_at').single();if(r.error)throw r.error;return r.data}
+async function research(q){run=await newRun();candidates=[];decisions=[];artifact=null;ui.run.textContent=`Run ${run.id.slice(0,8)}`;pipeline('research');ui.researchSection.hidden=false;ui.generation.hidden=true;ui.artifact.hidden=true;ui.candidates.innerHTML='<p class="empty-state">Searching GitHub repositories…</p>';const f=await client.functions.invoke('research-open-source',{body:{query:q,limit:8}});if(f.error)throw f.error;if(!f.data||f.data.error)throw new Error(f.data?.error||'Open-source research failed.');const rows=f.data.candidates.map(c=>({...c,project_id:project.id,run_id:run.id}));if(rows.length){const s=await client.from('oss_candidates').insert(rows).select('id,project_id,run_id,repository_full_name,repository_url,description,license_spdx,stars,primary_language,pushed_at,archived,maintenance_state,license_state,notes,raw_metadata');if(s.error)throw s.error;candidates=s.data??[]}ui.caveat.textContent=f.data.caveat;renderCandidates();pipeline('license');await Promise.all([client.from('build_runs').update({status:'reviewing',stage:'license'}).eq('id',run.id),client.from('builder_projects').update({status:'ready',updated_at:new Date().toISOString()}).eq('id',project.id)]);project.status='ready';await recent()}
+async function createProject(e){e.preventDefault();if(!client)return;const q=ui.query.value.trim()||derivedQuery();if(!q)return msg(ui.projectMsg,'Add a more specific brief or search query.',true);busy(ui.research,true,'Creating & researching…');msg(ui.projectMsg,'Creating project…');pipeline('inspect');try{const r=await client.from('builder_projects').insert({name:ui.name.value.trim(),brief:ui.brief.value.trim(),stack_preferences:ui.stack.value.trim(),deployment_target:ui.target.value,status:'researching'}).select('id,name,brief,stack_preferences,deployment_target,status,created_at').single();if(r.error)throw r.error;project=r.data;msg(ui.projectMsg,`Project created. Researching: ${q}`);await research(q);msg(ui.projectMsg,'Research complete. Review candidates and record integration decisions.')}catch(e){msg(ui.projectMsg,e instanceof Error?e.message:'Project creation failed.',true);pipeline('inspect');if(project?.id)await client.from('builder_projects').update({status:'failed',updated_at:new Date().toISOString()}).eq('id',project.id)}finally{busy(ui.research,false)}}
+function decisionRows(){const rows=[];ui.candidates.querySelectorAll('.candidate-card').forEach(card=>{if(!card.querySelector('.candidate-checkbox').checked)return;const c=candidates.find(x=>x.id===card.dataset.candidateId),why=card.querySelector('.candidate-rationale').value.trim();if(!c)return;if(why.length<3)throw new Error(`Add a rationale for ${c.repository_full_name}.`);rows.push({project_id:project.id,run_id:run.id,candidate_id:c.id,decision:card.querySelector('.candidate-decision').value,integration_method:card.querySelector('.candidate-method').value,rationale:why})});if(ui.custom.checked){const why=ui.customWhy.value.trim();if(why.length<3)throw new Error('Explain why custom implementation is necessary.');rows.push({project_id:project.id,run_id:run.id,candidate_id:null,decision:'custom',integration_method:'custom',rationale:why})}if(!rows.length)throw new Error('Select at least one candidate or record a custom implementation decision.');return rows}
+async function save(){if(!run)return;busy(ui.save,true,'Saving…');try{const rows=decisionRows(),d=await client.from('integration_decisions').delete().eq('run_id',run.id);if(d.error)throw d.error;const r=await client.from('integration_decisions').insert(rows).select('id,candidate_id,decision,integration_method,rationale');if(r.error)throw r.error;decisions=(r.data??[]).map(x=>({...x,repository_full_name:candidates.find(c=>c.id===x.candidate_id)?.repository_full_name||'custom implementation'}));await client.from('build_runs').update({status:'reviewing',stage:'integrate'}).eq('id',run.id);pipeline('integrate');ui.generation.hidden=false;ui.generation.scrollIntoView({behavior:'smooth'});msg(ui.decisionMsg,'Integration decisions saved. Source generation is ready.')}catch(e){msg(ui.decisionMsg,e instanceof Error?e.message:'Could not save decisions.',true)}finally{busy(ui.save,false)}}
+function renderArtifact(b){ui.artifact.hidden=false;ui.summary.textContent=b.summary;ui.verification.textContent='Unverified · run generated project checks';ui.verification.dataset.state='warning';ui.files.innerHTML=b.files.map(f=>`<li>${esc(f.path)}</li>`).join('');const cmds=b.verification_commands?.length?b.verification_commands:['Review README.md and run the generated project install/test/build commands.'];ui.commands.innerHTML=cmds.map(c=>`<li><code>${esc(c)}</code></li>`).join('');const lim=b.limitations?.length?b.limitations:['No execution sandbox has verified this generated bundle yet.'];ui.limits.innerHTML=lim.map(x=>`<li>${esc(x)}</li>`).join('')}
+async function generate(){if(!project||!run)return;if(!decisions.length)return msg(ui.generationMsg,'Save integration decisions before generating source.',true);const token=ui.token.value.trim(),model=ui.model.value.trim();if(!token)return msg(ui.generationMsg,'Enter a Hugging Face token with Inference Providers permission.',true);busy(ui.generate,true,'Generating…');msg(ui.generationMsg,'Generating source with selected research context…');pipeline('build');try{await Promise.all([client.from('build_runs').update({status:'generating',stage:'build',model}).eq('id',run.id),client.from('builder_projects').update({status:'generating',updated_at:new Date().toISOString()}).eq('id',project.id)]);const ids=new Set(decisions.map(x=>x.candidate_id).filter(Boolean)),selected=candidates.filter(c=>ids.has(c.id));const f=await client.functions.invoke('generate-app',{body:{project_name:project.name,brief:project.brief,stack_preferences:project.stack_preferences,deployment_target:project.deployment_target,hf_token:token,model,candidates:selected,decisions}});ui.token.value='';if(f.error)throw f.error;if(!f.data||f.data.error)throw new Error(f.data?.error||'Generation failed.');const filename=`${slug(project.name)}-source-bundle.json`,r=await client.from('builder_artifacts').insert({project_id:project.id,run_id:run.id,kind:'source_bundle',filename,content:f.data,verification_state:'unverified'}).select('id,filename,content,verification_state,created_at').single();if(r.error)throw r.error;artifact=r.data;await Promise.all([client.from('build_runs').update({status:'artifact_ready',stage:'artifact_ready',completed_at:new Date().toISOString()}).eq('id',run.id),client.from('builder_projects').update({status:'artifact_ready',updated_at:new Date().toISOString()}).eq('id',project.id)]);project.status='artifact_ready';pipeline('test',true);renderArtifact(f.data);await recent();ui.artifact.scrollIntoView({behavior:'smooth'});msg(ui.generationMsg,'Source bundle generated and saved. It remains unverified until its checks run.')}catch(e){ui.token.value='';const m=e instanceof Error?e.message:'Source generation failed.';msg(ui.generationMsg,m,true);await Promise.all([client.from('build_runs').update({status:'failed',stage:'failed',error_message:m,completed_at:new Date().toISOString()}).eq('id',run.id),client.from('builder_projects').update({status:'failed',updated_at:new Date().toISOString()}).eq('id',project.id)])}finally{busy(ui.generate,false)}}
+async function zip(){const b=artifact?.content;if(!b?.files?.length)return;if(!globalThis.JSZip)return msg(ui.generationMsg,'JSZip could not load. Use JSON download instead.',true);const z=new globalThis.JSZip();b.files.forEach(f=>z.file(f.path,f.content));download(`${slug(project.name)}.zip`,await z.generateAsync({type:'blob',compression:'DEFLATE'}))}
+function jsonDownload(){if(!artifact?.content)return;download(artifact.filename||`${slug(project.name)}-bundle.json`,new Blob([JSON.stringify(artifact.content,null,2)],{type:'application/json'}))}
+async function again(){if(!project)return;busy(ui.refreshResearch,true,'Researching…');try{await research(ui.query.value.trim()||derivedQuery());msg(ui.projectMsg,'New research run created. Review the new candidates.')}catch(e){msg(ui.projectMsg,e instanceof Error?e.message:'Research failed.',true)}finally{busy(ui.refreshResearch,false)}}
+async function init(){if(!supabaseUrl||!supabasePublishableKey){ui.state.textContent='Supabase not configured';ui.state.dataset.state='error';ui.research.disabled=true;return msg(ui.projectMsg,'Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in Cloudflare build variables.',true)}if(!globalThis.supabase?.createClient){ui.state.textContent='Supabase client unavailable';ui.state.dataset.state='error';return}client=globalThis.supabase.createClient(supabaseUrl,supabasePublishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});try{ui.state.textContent='Creating anonymous workspace…';await session();ui.state.textContent='Workspace connected';ui.state.dataset.state='ready';ui.research.disabled=false;await recent()}catch(e){ui.state.textContent='Supabase setup required';ui.state.dataset.state='error';ui.research.disabled=true;msg(ui.projectMsg,e instanceof Error?e.message:'Supabase initialization failed.',true)}}
+ui.form.addEventListener('submit',createProject);ui.save.addEventListener('click',save);ui.generate.addEventListener('click',generate);ui.zip.addEventListener('click',zip);ui.json.addEventListener('click',jsonDownload);ui.refreshResearch.addEventListener('click',again);ui.refreshProjects.addEventListener('click',()=>recent().catch(e=>ui.projects.innerHTML=`<p class="empty-state">${esc(e.message||'Could not refresh projects.')}</p>`));pipeline('inspect');init();

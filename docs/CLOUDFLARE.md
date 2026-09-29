@@ -1,55 +1,55 @@
 # Cloudflare Workers Deployment
 
-This repository is configured for the current **Cloudflare Workers Builds + Static Assets** Git workflow.
+This repository uses **Cloudflare Workers Builds + Static Assets**, not legacy Pages configuration.
 
 ## Git build settings
 
-Connect `SE-66/SE-66-timesfm-research-workspace` and use:
+Repository:
+
+`SE-66/SE-66-timesfm-research-workspace`
+
+Use:
 
 - Production branch: `main`
 - Build command: `npm run build`
 - Deploy command: `npx wrangler deploy`
 - Root directory: repository root / blank
 
-The build writes the site to `dist/`. `wrangler.jsonc` then tells Workers Static Assets to deploy that directory:
+`wrangler.jsonc` deploys `./dist` as Worker static assets.
 
-```json
-{
-  "name": "timesfm-research-workspace",
-  "compatibility_date": "2026-09-29",
-  "assets": {
-    "directory": "./dist"
-  }
-}
+## Required build variables
+
+Add both variables to the production build environment and to preview builds if previews should be functional:
+
+```text
+SUPABASE_URL=https://vuwxwbdptspvbxptpmub.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
-Do not use `wrangler pages deploy` for this Cloudflare Worker project.
+Use the Supabase **publishable** key. Never use a secret/service-role key.
 
-## Supabase build variables
+A successful build prints:
 
-Add these as **build-time environment variables** for the production trigger (and preview trigger if you want Supabase enabled in previews):
+`Built static site to dist/ (Supabase enabled).`
 
-- `SUPABASE_URL=https://vuwxwbdptspvbxptpmub.supabase.co`
-- `SUPABASE_PUBLISHABLE_KEY=sb_publishable_...`
+If it prints `Supabase disabled`, the builder UI can load but project/research/generation actions are intentionally disabled.
 
-The production build reports whether these were present:
+## Public URL
 
-- `Built static site to dist/ (Supabase enabled).` — both variables were provided.
-- `Built static site to dist/ (Supabase disabled).` — one or both were absent.
+After deployment, enable a `workers.dev` route or custom domain under the Worker's **Settings → Domains & Routes**. The Worker currently has no public URL until a route is enabled.
 
-Only use the Supabase publishable browser key. Never put a service-role or secret key in this frontend.
+## Headers
 
-## Static response security
+`public/_headers` is copied into `dist/_headers` and constrains:
 
-`public/_headers` is copied into `dist/`. Cloudflare Workers Static Assets parses the `_headers` file and applies its CSP and other response-security headers to static asset responses.
+- script origins;
+- Supabase network connections;
+- framing;
+- browser capability permissions.
 
-## Verification
+## Deployment verification
 
-Before deployment:
+Cloudflare build logs should show both:
 
-```bash
-npm ci
-npm run check
-```
-
-A successful Git deployment runs `npm run build` and then `npx wrangler deploy`, which uploads `./dist` through the Workers Static Assets configuration.
+1. `npm run build` succeeds;
+2. `npx wrangler deploy` uploads `./dist` using the `assets.directory` configuration.

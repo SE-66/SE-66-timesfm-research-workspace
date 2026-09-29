@@ -1,54 +1,73 @@
 # Supabase Setup
 
-## Feature scope
+## Project
 
-Supabase persists only app-owned research-log metadata. It does not run TimesFM and does not receive CSV files uploaded inside the Hugging Face iframe.
+Current project URL:
 
-## 1. Create/select a project
+`https://vuwxwbdptspvbxptpmub.supabase.co`
 
-Use a Supabase project appropriate for the research environment. Record the project URL and publishable key.
+Anonymous Sign-Ins must be enabled under Authentication settings.
 
-## 2. Enable Anonymous Sign-Ins
+## Schema
 
-Enable anonymous authentication in the Supabase Auth settings. This allows the application to create an authenticated user without an email/password UI.
+The app-builder control plane is defined by:
 
-Anonymous users receive the `authenticated` Postgres role and are isolated by RLS. Their browser session is not recoverable after clearing browser storage unless the account is later linked to a permanent identity.
+`supabase/migrations/20260929080000_create_open_source_app_builder_core.sql`
 
-## 3. Apply the SQL migration
+Tables:
 
-Apply:
+- `builder_projects`
+- `build_runs`
+- `oss_candidates`
+- `integration_decisions`
+- `builder_artifacts`
 
-`supabase/migrations/202609290001_create_research_entries.sql`
+Every table has RLS enabled and scopes rows to the current `auth.uid()`.
 
-The migration:
+The earlier `research_entries` table belongs to the discarded forecasting prototype. It is not used by the current app and remains only to preserve migration history/data unless explicitly removed later.
 
-- creates `public.research_entries`;
-- enables RLS;
-- revokes table access from unauthenticated `anon`;
-- grants select/insert/delete to `authenticated`;
-- restricts every operation to `auth.uid() = user_id`;
-- adds an ownership/timestamp index.
+## Edge Functions
 
-## 4. Configure local development
+### research-open-source
 
-Use the values shown in `.env.example` as shell/build variables:
+Source:
 
-```bash
-SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co \
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_... \
-npm run build
-```
+`supabase/functions/research-open-source/index.ts`
 
-The build generates `dist/config.js`. Never use a service-role key in browser configuration.
+Deployment requirements:
 
-## 5. Configure Cloudflare Pages
+- JWT verification enabled.
+- No GitHub token is required for basic public search.
+- Optional `GITHUB_TOKEN` can be added as a server-side Supabase secret later to increase GitHub API rate limits.
 
-Set the same two **public** build-time variables in the Cloudflare Pages project configuration. `scripts/build.mjs` writes them into `dist/config.js`.
+### generate-app
 
-## 6. Verify RLS
+Source:
 
-Use two separate browser profiles/incognito sessions. Each should create a different anonymous Supabase user and see only the entries created by that user.
+`supabase/functions/generate-app/index.ts`
 
-## Public-launch hardening
+Deployment requirements:
 
-Anonymous-account creation may be automated. Before broad public exposure, consider abuse controls/rate limits and CAPTCHA/Turnstile integration. If Supabase CAPTCHA is enabled, the application must pass a valid token into `signInAnonymously()`.
+- JWT verification enabled.
+- No persistent model API key is required.
+- The user supplies a Hugging Face token for each generation request.
+- The function accepts only the fixed Hugging Face Inference Providers endpoint.
+
+## Browser build variables
+
+Cloudflare needs only:
+
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
+
+Do not use a secret/service-role key in browser configuration.
+
+## Security verification
+
+After schema changes:
+
+1. confirm RLS is enabled on every exposed builder table;
+2. confirm `anon` has no table privileges;
+3. confirm `authenticated` has only the required CRUD privileges;
+4. run Supabase Security Advisor;
+5. review Performance Advisor findings before changing indexes.

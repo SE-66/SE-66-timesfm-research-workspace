@@ -1,43 +1,83 @@
-# Source Review
+# Open-Source Source Review
 
-The project follows the supplied open-source source-priority policy: authoritative repositories/documentation and package registries are preferred; publicly visible code is not assumed reusable; license and compatibility boundaries are reviewed before integration.
+Review date: 2026-09-29
 
-## Google Research TimesFM
+The app-builder feature was researched before implementation. The reviewed projects were selected because they already solve adjacent AI coding/app-building problems and provide evidence for architecture rather than code to copy.
 
-- Repository: https://github.com/google-research/timesfm
-- Role: authoritative TimesFM source and release/license documentation.
-- License: repository `LICENSE` is Apache-2.0.
-- Current release note reviewed: TimesFM 3.0 is the latest version and its pretrained weights use the separate non-commercial license.
-- Decision: reference only; no source code copied.
+## bolt.diy
 
-## TimesFM 3.0 Hugging Face model
+Repository: `stackblitz-labs/bolt.diy`
 
-- Model: https://huggingface.co/google/timesfm-3.0-pytorch
-- Role: official model-card/reference endpoint.
-- Decision: no weights bundled or downloaded.
+License file: MIT.
 
-## TS Foundation Lab Space
+Relevant upstream characteristics reviewed:
 
-- Space: https://huggingface.co/spaces/hari31416/ts-foundation-lab
-- Metadata reviewed: Hugging Face identifies it as a Gradio Space.
-- Decision: embed as external service; do not copy Space source.
+- browser-based AI full-stack app development;
+- multiple model-provider adapters;
+- project ZIP export;
+- Git/deployment integrations;
+- Supabase integration;
+- project snapshots/diffs.
 
-## Supabase JavaScript client
+Decision: **architectural reference only**. Its Remix/WebContainer/provider surface is much larger than required for this Cloudflare/Supabase builder. Forking it would introduce unnecessary dependencies and alter the existing architecture rather than integrate the smallest necessary portion.
 
-- Repository: https://github.com/supabase/supabase-js
-- Package: `@supabase/supabase-js`
-- License: MIT.
-- Capability selected: Anonymous Auth plus PostgREST/Data API client.
-- Decision: official package dependency rather than custom Auth/REST implementation.
+Reviewed commit: `2e254ac19a696394030601bc602f54945b12bfc4`.
 
-## Supabase Anonymous Auth
+## OpenHands
 
-Official documentation reviewed for `signInAnonymously()` and the distinction between anonymous users and the unauthenticated `anon` key/role. Anonymous users receive the authenticated database role, so project RLS policies must still enforce row ownership.
+Repository: `OpenHands/OpenHands`
 
-## Cloudflare Pages
+License file: MIT.
 
-Official Cloudflare Pages documentation reviewed for GitHub Git integration, `dist` build output, Wrangler Pages configuration, and `_headers` static response headers.
+Relevant upstream characteristics reviewed:
 
-## Selection rationale
+- coding-agent control center;
+- separation between UI/control plane and agent backends;
+- support for local, Docker, VM, remote, and cloud execution backends;
+- bring-your-own-model design.
 
-This architecture uses established supported boundaries instead of reimplementing authentication, database clients, model inference, or hosting behavior. Supabase's documented pinned browser distribution keeps the local build dependency-free while still using the maintained client. Custom code is limited to application-specific research-log UI/state, public configuration generation, and repository verification.
+Decision: **architectural reference only** for the future sandbox/agent boundary. Current OpenHands Agent Canvas requires a significantly heavier backend/runtime than the desired Cloudflare static frontend + Supabase control plane.
+
+Reviewed commit: `94e156a8c7b7a468d7c60bda3a38757bfbfd4a79`.
+
+## Dyad
+
+Repository: `dyad-sh/dyad`
+
+License structure reviewed:
+
+- code outside `src/pro`: Apache-2.0 according to the root license/README;
+- `src/pro`: separate Functional Source License 1.1 / fair-source terms.
+
+Relevant characteristics:
+
+- local AI app builder;
+- bring-your-own-key workflow;
+- project/runtime tooling;
+- active Cloudflare-related work.
+
+Decision: **architectural reference only**. Electron/local runtime does not match Cloudflare deployment, and mixed licensing makes broad reuse inappropriate without a narrower source-level review.
+
+Reviewed commit: `eb22a365ccedb84e006ccf60cc4a1ac7594e7f8d`.
+
+## JSZip
+
+Repository: `Stuk/jszip`
+
+License: dual MIT/GPLv3; this project uses the MIT option.
+
+Decision: **dependency** through pinned browser distribution for source ZIP export instead of implementing ZIP generation ourselves.
+
+Reviewed commit: `609d95f4098a11507160cd101e0b181cfad6a582`.
+
+## Resulting implementation decision
+
+The current builder uses custom application-specific control-plane code because the reviewed full app builders are not drop-in compatible with the existing Cloudflare/Supabase architecture. It reuses maintained libraries/services at clean boundaries:
+
+- Supabase client for Auth/Data/Function calls;
+- JSZip for archive creation;
+- GitHub API for repository discovery;
+- Hugging Face Inference Providers for optional model execution;
+- Cloudflare Workers Static Assets for hosting.
+
+No source from bolt.diy, OpenHands, or Dyad was copied.

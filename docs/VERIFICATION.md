@@ -1,49 +1,64 @@
 # Verification
 
-## Automated checks
+## Builder repository
 
-From repository root:
+Run:
 
 ```bash
 npm ci
 npm run check
 ```
 
-This runs:
+`npm run check` executes:
 
-1. repository/source invariant verification;
+1. repository invariant checks;
 2. Node tests;
-3. dependency-free production build to `dist/`, including generated browser configuration.
+3. production static build.
 
-## Core manual checks (Supabase disabled)
+Also verify manually:
 
-1. Load the built site.
-2. Confirm the four workflow steps are readable.
-3. Confirm the embedded Space loads when browser/network policy permits.
-4. Confirm the direct Hugging Face fallback opens in a new tab.
-5. Confirm official TimesFM repository/model-card links work.
-6. Confirm the research log displays `Supabase not configured` and remains disabled without environment variables.
-7. Confirm B0/C1–C5 protocol cards remain visible and do not run forecasts.
+- responsive layout at desktop/tablet/mobile widths;
+- anonymous Supabase session initializes;
+- a project can be created;
+- GitHub OSS research returns candidate cards;
+- decisions persist;
+- generation without a Hugging Face token fails clearly;
+- generation with a valid Hugging Face token returns a bundle;
+- token is cleared after the attempt;
+- JSON/ZIP download works;
+- recent projects persist after reload;
+- generated artifact shows `Unverified`.
 
-## Supabase functional checks
+## Supabase
 
-After configuring a project, applying the migration, and enabling Anonymous Sign-Ins:
+Verify:
 
-1. Load the application and confirm status changes to `Supabase connected`.
-2. Save a research entry.
-3. Refresh and confirm the entry persists.
-4. Delete the entry and confirm it disappears.
-5. Open a second browser profile/incognito session and confirm it cannot see the first profile's entries.
-6. Confirm no raw CSV is uploaded by the outer application.
+- all builder tables have RLS enabled;
+- ownership policies use `auth.uid()`;
+- unauthenticated `anon` has no table privileges;
+- Edge Functions require valid JWTs;
+- Security Advisor has no unresolved high-impact findings.
 
-## Cloudflare checks
+## Cloudflare
 
-1. Connect the GitHub repository to Cloudflare Pages.
-2. Build with `npm run build` and output directory `dist`.
-3. Confirm `_headers` is active on the deployed response.
-4. Confirm branch/PR preview deployments build successfully.
-5. Confirm Supabase environment variables are set only where persistence is intended.
+Build with the live public Supabase values and confirm the build prints:
 
-## Responsive checks
+`Built static site to dist/ (Supabase enabled).`
 
-Check approximately 1440 px, 1024 px, 768 px, 390 px, and 320 px widths. The iframe, research-log form/list, navigation, and scenario cards must remain usable without horizontal clipping.
+Then verify the `workers.dev` or custom-domain route returns the builder UI with the CSP/security headers.
+
+## Generated applications
+
+The current control plane cannot execute arbitrary generated project commands. Every generated bundle is therefore `unverified`.
+
+Before considering a generated application complete, run its generated verification commands in an isolated sandbox/CI environment and confirm at minimum:
+
+- dependency installation;
+- development startup where applicable;
+- type checking/linting;
+- tests;
+- production build;
+- main user flow;
+- external API/database/auth operations;
+- validation/error handling;
+- deployment compatibility.

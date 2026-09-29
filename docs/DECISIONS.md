@@ -1,46 +1,41 @@
 # Architecture Decisions
 
-## ADR-001 — External Space is the TimesFM execution boundary
+## ADR-001 — Keep the app builder as a control plane
 
-Status: accepted.
+**Decision:** The browser/Supabase application coordinates research, decisions, source generation, and artifact persistence. It does not execute arbitrary generated project commands.
 
-The existing Hugging Face Space already provides a TimesFM-capable workflow. Embedding it is smaller and more truthful than implementing a local imitation and avoids bundling restricted TimesFM 3.0 pretrained weights.
+**Reason:** Running untrusted package managers/build scripts requires stronger isolation than Supabase Edge Functions or a browser provide.
 
-Consequences:
+**Consequence:** Generated bundles are marked `unverified` until a dedicated sandbox/CI adapter is added.
 
-- model execution remains external;
-- the app depends on third-party availability/iframe policy;
-- a permanent direct fallback is required;
-- CSV upload/data handling remains with the external environment.
+## ADR-002 — Search open source before generation
 
-## ADR-002 — No local baseline presented as TimesFM
+**Decision:** A build run performs GitHub repository discovery before source generation and persists the results.
 
-Status: accepted.
+**Reason:** Open-source reuse should be evidence-based and auditable, not an invisible prompt instruction.
 
-This repository does not generate substitute TimesFM outputs. Future baselines must be labeled as distinct models/algorithms.
+**Consequence:** Users can see repository/license/maintenance metadata and explicitly record how a candidate should be used.
 
-## ADR-003 — Keep the local build dependency-free
+## ADR-003 — Metadata does not equal permission
 
-Status: accepted.
+**Decision:** GitHub search metadata is never enough to authorize source reuse.
 
-Supabase officially supports browser CDN distribution. The repository therefore keeps its Node build dependency-free and loads an exact pinned `@supabase/supabase-js` browser build from jsDelivr. This avoids reimplementing Auth/Data APIs while keeping Cloudflare/GitHub builds small. The CSP explicitly permits only the required CDN host.
+**Reason:** SPDX metadata can be absent, incomplete, mixed, or inconsistent with specific subdirectories/assets/dependencies.
 
-## ADR-004 — Supabase Anonymous Auth instead of public anonymous table access
+**Consequence:** Unknown/reciprocal/restricted licenses are classified cautiously, and generated-code prompts prohibit silent source copying.
 
-Status: accepted.
+## ADR-004 — BYOK Hugging Face token
 
-A no-login research experience still needs per-user row ownership. Supabase Anonymous Sign-Ins provide an authenticated `auth.uid()` without collecting email/password credentials. RLS scopes all research-log rows to that identity.
+**Decision:** The first source-generation provider is Hugging Face Inference Providers with a user-supplied token sent per request.
 
-Tradeoff: the identity is tied to browser session storage and cannot be recovered after it is cleared unless later linked to a permanent identity.
+**Reason:** This supports open-weight coding models without storing a shared model-provider secret in the builder database.
 
-## ADR-005 — Persist metadata, not CSV/model payloads
+**Consequence:** The token is not persisted, and the Edge Function uses a fixed outbound provider host to reduce SSRF risk.
 
-Status: accepted.
+## ADR-005 — Reference full app builders instead of forking them
 
-The research log stores only experiment metadata/notes. Raw CSV files and external Space outputs are not automatically copied into Supabase. This keeps the data boundary narrow and avoids silently duplicating potentially sensitive research datasets.
+**Decision:** bolt.diy, OpenHands, and Dyad are architectural references only.
 
-## ADR-006 — GitHub + Cloudflare Pages is the deployment pipeline
+**Reason:** Their runtimes and dependency surfaces are substantially larger/different from this Cloudflare/Supabase architecture; Dyad also has a mixed license boundary.
 
-Status: accepted.
-
-GitHub is the code/review source of truth. Cloudflare Pages Git integration runs the production build and deploys `dist/`, while GitHub Actions performs independent repository verification/tests/build checks.
+**Consequence:** The current implementation remains small and application-specific while adopting the useful separation patterns observed in those projects.

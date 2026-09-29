@@ -5,167 +5,230 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="A research interface for zero-shot time-series forecasting with Google TimesFM 3 through an external Hugging Face Space, with an optional Supabase research log."
+      content="Open-source-first app builder that researches reusable projects, records licensing decisions, and generates downloadable application source bundles."
     />
-    <title>TimesFM Research Workspace</title>
+    <title>Open Source App Builder</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <a class="skip-link" href="#workspace">Skip to forecasting workspace</a>
+    <a class="skip-link" href="#builder">Skip to app builder</a>
 
     <header class="site-header">
-      <div class="shell header-grid">
+      <div class="shell header-row">
         <div>
-          <p class="eyebrow">Research prototype · external model execution</p>
-          <h1>TimesFM Research Workspace</h1>
-          <p class="subtitle">Zero-shot time-series forecasting with Google TimesFM 3</p>
+          <p class="eyebrow">Inspect → Research → License → Integrate → Build → Verify</p>
+          <h1>Open Source App Builder</h1>
+          <p class="subtitle">Build new applications by researching proven open-source foundations before generating custom code.</p>
         </div>
-        <nav class="resource-links" aria-label="Official TimesFM resources">
-          <a href="https://github.com/google-research/timesfm" target="_blank" rel="noopener noreferrer">Official repository ↗</a>
-          <a href="https://huggingface.co/google/timesfm-3.0-pytorch" target="_blank" rel="noopener noreferrer">Model card ↗</a>
-        </nav>
+        <div class="header-status">
+          <span id="supabase-state" class="status-chip" data-state="loading">Connecting…</span>
+          <a href="https://github.com/SE-66/SE-66-timesfm-research-workspace" target="_blank" rel="noopener noreferrer">Source repository ↗</a>
+        </div>
       </div>
     </header>
 
-    <main class="shell">
-      <section class="intro-grid" aria-labelledby="workflow-heading">
-        <aside class="panel guidance">
-          <p class="section-kicker">Workflow</p>
-          <h2 id="workflow-heading">Run a forecast</h2>
-          <ol class="steps">
-            <li><span>01</span><div><strong>Upload CSV</strong><p>Load the time-series file inside the embedded Hugging Face Space.</p></div></li>
-            <li><span>02</span><div><strong>Select timestamp and target</strong><p>Identify the time column and series you want to forecast.</p></div></li>
-            <li><span>03</span><div><strong>Choose TimesFM-3 and horizon</strong><p>Use the Space controls to select the model and future steps.</p></div></li>
-            <li><span>04</span><div><strong>Run and inspect uncertainty</strong><p>Review the forecast and any uncertainty outputs exposed by the Space.</p></div></li>
-          </ol>
-        </aside>
-
-        <section id="workspace" class="panel workspace" aria-labelledby="workspace-heading">
-          <div class="workspace-bar">
+    <main id="builder" class="shell page-grid">
+      <section class="main-column">
+        <section class="panel hero-panel" aria-labelledby="brief-heading">
+          <div class="section-heading">
             <div>
-              <p class="section-kicker">Live external workspace</p>
-              <h2 id="workspace-heading">TS Foundation Lab</h2>
+              <p class="section-kicker">1 · Define the build</p>
+              <h2 id="brief-heading">What do you want to build?</h2>
             </div>
-            <a class="primary-link" href="https://huggingface.co/spaces/hari31416/ts-foundation-lab" target="_blank" rel="noopener noreferrer">Open directly ↗</a>
+            <span class="policy-chip">Open-source first</span>
           </div>
-          <div class="frame-wrap">
-            <iframe
-              src="https://hari31416-ts-foundation-lab.hf.space"
-              title="TS Foundation Lab — TimesFM forecasting workspace on Hugging Face"
-              loading="eager"
-              referrerpolicy="strict-origin-when-cross-origin"
-              allow="clipboard-write"
-            ></iframe>
+
+          <form id="project-form" class="project-form">
+            <label>
+              Project name
+              <input id="project-name" name="project-name" maxlength="120" required placeholder="Example: Clinic appointment portal" />
+            </label>
+
+            <label>
+              Application brief
+              <textarea id="project-brief" name="project-brief" rows="8" minlength="10" maxlength="12000" required placeholder="Describe the users, workflows, integrations, data, permissions, deployment constraints, and what must actually work."></textarea>
+            </label>
+
+            <div class="field-grid">
+              <label>
+                Stack preferences
+                <input id="stack-preferences" maxlength="2000" placeholder="Optional: React, TypeScript, Supabase, Cloudflare" />
+              </label>
+              <label>
+                Deployment target
+                <select id="deployment-target">
+                  <option value="cloudflare">Cloudflare</option>
+                  <option value="vercel">Vercel</option>
+                  <option value="netlify">Netlify</option>
+                  <option value="docker">Docker / self-hosted</option>
+                  <option value="other">Other / decide from requirements</option>
+                </select>
+              </label>
+            </div>
+
+            <label>
+              Open-source search query
+              <input id="oss-query" maxlength="180" placeholder="Optional. Leave blank to derive keywords from the brief." />
+              <span class="field-help">GitHub search is discovery only. License, compatibility, security, and source still require review.</span>
+            </label>
+
+            <div class="form-actions">
+              <button id="research-button" class="primary-button" type="submit">Create project & research open source</button>
+              <span id="project-message" class="form-message" role="status"></span>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel pipeline-panel" aria-labelledby="pipeline-heading">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="section-kicker">Build control</p>
+              <h2 id="pipeline-heading">Engineering pipeline</h2>
+            </div>
+            <span id="run-label" class="run-label">No active run</span>
           </div>
-          <div class="fallback-note">
-            <strong>If the embed is blank or blocked:</strong>
-            <span>Open the Hugging Face Space directly using the button above. This page does not simulate TimesFM locally.</span>
+          <ol id="pipeline" class="pipeline" aria-label="Build pipeline stages">
+            <li data-stage="inspect"><span>01</span><strong>Inspect</strong></li>
+            <li data-stage="research"><span>02</span><strong>Research</strong></li>
+            <li data-stage="license"><span>03</span><strong>License</strong></li>
+            <li data-stage="understand"><span>04</span><strong>Understand</strong></li>
+            <li data-stage="integrate"><span>05</span><strong>Integrate</strong></li>
+            <li data-stage="build"><span>06</span><strong>Build</strong></li>
+            <li data-stage="test"><span>07</span><strong>Test</strong></li>
+            <li data-stage="verify"><span>08</span><strong>Verify</strong></li>
+          </ol>
+          <p class="pipeline-note">This browser app performs discovery, decision capture, and source generation. Generated apps remain <strong>unverified</strong> until their own install/test/build commands run in a sandbox or CI environment.</p>
+        </section>
+
+        <section id="research-section" class="panel" aria-labelledby="research-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">2 · Research and decide</p>
+              <h2 id="research-heading">Open-source candidates</h2>
+            </div>
+            <button id="refresh-research" class="secondary-button" type="button">Research again</button>
+          </div>
+          <p id="research-caveat" class="notice"></p>
+          <div id="candidate-list" class="candidate-list"></div>
+          <div class="custom-decision">
+            <label class="check-row">
+              <input id="custom-implementation" type="checkbox" />
+              <span><strong>No candidate is suitable</strong><br /><small>Record a custom implementation decision instead of reusing an unsuitable project.</small></span>
+            </label>
+            <label>
+              Custom rationale
+              <textarea id="custom-rationale" rows="3" maxlength="4000" placeholder="Why the researched projects are incompatible, insecure, abandoned, over-complex, or legally unsuitable."></textarea>
+            </label>
+          </div>
+          <div class="decision-actions">
+            <button id="save-decisions" class="primary-button" type="button">Save integration decisions</button>
+            <span id="decision-message" class="form-message" role="status"></span>
+          </div>
+        </section>
+
+        <section id="generation-section" class="panel" aria-labelledby="generation-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">3 · Generate source</p>
+              <h2 id="generation-heading">Create the application bundle</h2>
+            </div>
+            <span class="status-chip" data-state="warning">BYOK · token not stored</span>
+          </div>
+
+          <div class="generation-grid">
+            <label>
+              Hugging Face token
+              <input id="hf-token" type="password" autocomplete="off" placeholder="hf_…" />
+              <span class="field-help">Sent once to the Supabase Edge Function and forwarded to Hugging Face Inference Providers. It is not saved in Supabase.</span>
+            </label>
+            <label>
+              Coding model
+              <input id="hf-model" value="Qwen/Qwen3-Coder-480B-A35B-Instruct:fastest" />
+              <span class="field-help">Use a chat-completion model available through Hugging Face Inference Providers.</span>
+            </label>
+          </div>
+
+          <div class="generation-actions">
+            <button id="generate-button" class="primary-button" type="button">Generate source bundle</button>
+            <span id="generation-message" class="form-message" role="status"></span>
+          </div>
+        </section>
+
+        <section id="artifact-section" class="panel" aria-labelledby="artifact-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">4 · Artifact</p>
+              <h2 id="artifact-heading">Generated application</h2>
+            </div>
+            <span id="verification-badge" class="status-chip" data-state="warning">Unverified</span>
+          </div>
+          <p id="artifact-summary" class="artifact-summary"></p>
+          <div class="artifact-actions">
+            <button id="download-zip" class="primary-button" type="button">Download source ZIP</button>
+            <button id="download-json" class="secondary-button" type="button">Download bundle JSON</button>
+          </div>
+          <div class="artifact-grid">
+            <div>
+              <h3>Files</h3>
+              <ul id="artifact-files" class="artifact-list"></ul>
+            </div>
+            <div>
+              <h3>Verification commands</h3>
+              <ol id="verification-commands" class="command-list"></ol>
+              <h3>Known limitations</h3>
+              <ul id="artifact-limitations" class="artifact-list"></ul>
+            </div>
           </div>
         </section>
       </section>
 
-      <section class="notes-grid" aria-label="Research and data notes">
-        <article class="panel note-card">
-          <p class="section-kicker">Execution boundary</p>
-          <h2>What this app does</h2>
-          <p>This outer interface provides navigation, guidance, license context, the iframe container, and an optional research log. It does not run TimesFM, proxy CSV uploads, or receive the CSV uploaded inside the Space.</p>
-          <p>Files uploaded inside the embedded interface are handled by the third-party Hugging Face Space and its hosting environment.</p>
-        </article>
+      <aside class="sidebar">
+        <section class="panel sidebar-panel">
+          <p class="section-kicker">Operating rules</p>
+          <h2>What this builder enforces</h2>
+          <ul class="rule-list">
+            <li>Research established open-source solutions before substantial implementation.</li>
+            <li>Prefer maintained, documented, compatible projects over rebuilding generic functionality.</li>
+            <li>Do not treat public GitHub source as automatically reusable.</li>
+            <li>Record license and integration decisions before generated code uses a candidate.</li>
+            <li>Never embed service-role keys, provider tokens, or other secrets in generated source.</li>
+            <li>Never report generated projects as tested when no execution sandbox has run them.</li>
+          </ul>
+        </section>
 
-        <article class="panel note-card">
-          <p class="section-kicker">License boundary</p>
-          <h2>Research use</h2>
-          <p>The <code>google-research/timesfm</code> source repository is Apache-2.0. TimesFM 3.0 pretrained weights are distributed separately under <code>timesfm-non-commercial-license-v1.0</code> and are restricted to non-commercial, non-production use.</p>
-          <p>Review the current official repository and model card before relying on the model in a new workflow.</p>
-        </article>
-      </section>
-
-      <section class="panel research-log" aria-labelledby="research-log-heading">
-        <div class="section-heading-row">
-          <div>
-            <p class="section-kicker">Optional Supabase persistence</p>
-            <h2 id="research-log-heading">Research log</h2>
+        <section class="panel sidebar-panel">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="section-kicker">Workspace</p>
+              <h2>Recent projects</h2>
+            </div>
+            <button id="refresh-projects" class="text-button" type="button">Refresh</button>
           </div>
-          <span id="supabase-state" class="status-badge" data-state="loading">Checking configuration…</span>
-        </div>
-        <p class="section-intro">
-          Save only experiment metadata and notes here. CSV files and TimesFM outputs from the embedded Space are not copied into Supabase by this application.
-        </p>
-
-        <div class="log-grid">
-          <form id="research-log-form" class="log-form" autocomplete="off">
-            <label>
-              <span>Entry title</span>
-              <input id="entry-title" name="title" maxlength="120" required placeholder="e.g. AAPL weekly horizon sensitivity" />
-            </label>
-            <div class="form-row">
-              <label>
-                <span>Scenario</span>
-                <select id="entry-scenario" name="scenario" required>
-                  <option value="B0">B0 · Baseline zero-shot</option>
-                  <option value="C1">C1 · Volatility regimes</option>
-                  <option value="C2">C2 · Exogenous covariates</option>
-                  <option value="C3">C3 · Event windows</option>
-                  <option value="C4">C4 · Horizon sensitivity</option>
-                  <option value="C5">C5 · Rolling backtests</option>
-                </select>
-              </label>
-              <label>
-                <span>Dataset label</span>
-                <input id="entry-dataset" name="dataset" maxlength="120" placeholder="Non-sensitive label only" />
-              </label>
-            </div>
-            <label>
-              <span>Notes</span>
-              <textarea id="entry-notes" name="notes" maxlength="4000" rows="5" placeholder="Protocol, horizon, observations, conclusions…"></textarea>
-            </label>
-            <div class="form-actions">
-              <button id="save-entry" type="submit" disabled>Save research entry</button>
-              <span id="form-message" role="status" aria-live="polite"></span>
-            </div>
-          </form>
-
-          <div class="log-list-panel">
-            <div class="log-list-heading">
-              <h3>Saved entries</h3>
-              <button id="refresh-entries" type="button" class="secondary-button" disabled>Refresh</button>
-            </div>
-            <div id="research-entries" class="research-entries" aria-live="polite">
-              <p class="empty-state">Configure Supabase to enable the private research log.</p>
-            </div>
+          <div id="recent-projects" class="recent-projects">
+            <p class="empty-state">No projects loaded yet.</p>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="panel experiments" aria-labelledby="experiments-heading">
-        <div class="section-heading-row">
-          <div>
-            <p class="section-kicker">Research protocol</p>
-            <h2 id="experiments-heading">PhD Experiment Mode</h2>
-          </div>
-          <span class="planned-badge">Protocol labels</span>
-        </div>
-        <p class="section-intro">B0 and C1–C5 are research-protocol labels; the cards below do not execute forecasts. The optional Supabase log can record notes against these labels.</p>
-        <div class="scenario-grid">
-          <article><span>B0</span><h3>Baseline zero-shot</h3><p>Reference TimesFM-3 forecast on the original series.</p></article>
-          <article><span>C1</span><h3>Volatility regimes</h3><p>Compare forecast behavior across predefined volatility states.</p></article>
-          <article><span>C2</span><h3>Exogenous covariates</h3><p>Evaluate multivariate context such as benchmarks or macro series.</p></article>
-          <article><span>C3</span><h3>Event windows</h3><p>Inspect behavior around scheduled earnings, releases, or policy dates.</p></article>
-          <article><span>C4</span><h3>Horizon sensitivity</h3><p>Measure forecast and uncertainty behavior across multiple horizons.</p></article>
-          <article><span>C5</span><h3>Rolling backtests</h3><p>Use walk-forward origins for repeatable out-of-sample evaluation.</p></article>
-        </div>
-      </section>
+        <section class="panel sidebar-panel reference-panel">
+          <p class="section-kicker">Architecture references</p>
+          <p>The builder was designed after reviewing open-source coding/app-builder projects. They are references, not copied code.</p>
+          <a href="https://github.com/stackblitz-labs/bolt.diy" target="_blank" rel="noopener noreferrer">bolt.diy · MIT ↗</a>
+          <a href="https://github.com/OpenHands/OpenHands" target="_blank" rel="noopener noreferrer">OpenHands · MIT ↗</a>
+          <a href="https://github.com/dyad-sh/dyad" target="_blank" rel="noopener noreferrer">Dyad · mixed Apache-2.0/FSL areas ↗</a>
+        </section>
+      </aside>
     </main>
 
     <footer class="site-footer">
-      <div class="shell footer-grid">
-        <p>Prototype research interface — model execution is provided by the embedded Hugging Face Space.</p>
-        <p>App-owned research-log metadata can be stored in Supabase when configured.</p>
+      <div class="shell footer-row">
+        <span>Open Source App Builder</span>
+        <span>GitHub research · Supabase control plane · Cloudflare deployment</span>
       </div>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2"></script>
     <script src="./config.js"></script>
-    <script type="module" src="./main.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" crossorigin="anonymous"></script>
+    <script src="./main.js" defer></script>
   </body>
 </html>

@@ -1,8 +1,8 @@
 {
-  "name": "timesfm-research-workspace",
-  "version": "1.1.1",
+  "name": "open-source-app-builder",
+  "version": "2.0.0",
   "private": true,
-  "description": "Research interface for Google TimesFM 3 with Cloudflare Workers static-assets deployment and optional Supabase research-log persistence.",
+  "description": "Open-source-first app builder with GitHub research, Supabase workflow state, Hugging Face source generation, and Cloudflare deployment.",
   "type": "module",
   "scripts": {
     "dev": "npm run build && node scripts/serve.mjs",

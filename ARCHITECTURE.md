@@ -1,78 +1,90 @@
 # Architecture
 
-## Goals
+## Product goal
 
-1. Present a reliable research interface for the existing TimesFM-capable Hugging Face Space.
-2. Keep model execution and CSV handling outside the application boundary.
-3. Use GitHub as the source-of-truth repository and Cloudflare Workers Static Assets for deployment.
-4. Add narrowly scoped Supabase persistence for research metadata without exposing privileged credentials.
-5. Preserve a clean future adapter boundary for an authorized inference API.
+Create applications by combining three distinct activities instead of collapsing them into one model prompt:
 
-## Runtime components
+1. **research** reusable open-source projects;
+2. **record** a licensing/compatibility integration decision;
+3. **generate** the application-specific source bundle from the resulting evidence.
 
-### Static application
+The architecture deliberately keeps arbitrary generated-code execution outside the current control plane.
 
-- `src/index.html` contains semantic page structure and the external iframe.
-- `src/styles.css` contains responsive presentation.
-- `src/main.js` contains the optional Supabase research-log client.
-- `scripts/build.mjs` copies validated source into `dist/` and generates `config.js` from public build variables.
+## Browser application
 
-### External TimesFM workspace
+The browser application is a dependency-light static UI built from:
 
-Iframe:
+- `src/index.html`
+- `src/styles.css`
+- `src/main.js`
 
-`https://hari31416-ts-foundation-lab.hf.space`
+It manages the workflow, renders research results, records decisions, requests source generation, and downloads the resulting source ZIP.
 
-Direct fallback:
+The browser does not contain privileged credentials.
 
-`https://huggingface.co/spaces/hari31416/ts-foundation-lab`
+## Supabase control plane
 
-This origin is a separate trust, data, and model-execution boundary.
+### Authentication
 
-### Supabase research log
+The builder creates or resumes a Supabase anonymous user. Anonymous users use the `authenticated` Postgres role, so RLS is mandatory.
 
-The browser uses the pinned official `@supabase/supabase-js` UMD build distributed through jsDelivr with a project URL and publishable key. When configured, it creates or resumes an anonymous Supabase Auth session and reads/writes `public.research_entries`.
+### Data model
 
-Stored fields are intentionally limited to title, B0/C1–C5 scenario label, non-sensitive dataset label, researcher notes, timestamps, and ownership identifier managed by Supabase/Postgres.
+- `builder_projects` — application brief and project status.
+- `build_runs` — immutable-ish run identity plus current pipeline stage/status.
+- `oss_candidates` — GitHub repository discovery metadata.
+- `integration_decisions` — user decision about reuse/reference/reject/custom implementation.
+- `builder_artifacts` — generated source bundles and future build/verification artifacts.
 
-RLS enforces `auth.uid() = user_id` for select/insert/delete. The browser never receives a service-role key.
+All tables carry `user_id` and enforce ownership with RLS.
 
-### GitHub
+### Edge Functions
 
-GitHub is the source repository, code-review surface, and CI trigger. `.github/workflows/ci.yml` verifies source invariants, tests, and production build output.
+#### `research-open-source`
 
-### Cloudflare Workers Static Assets
+- requires a valid Supabase JWT;
+- sends a bounded query to GitHub repository search;
+- uses a fixed GitHub API host;
+- classifies SPDX metadata into permissive/reciprocal/restricted/unknown/review categories;
+- derives a basic maintenance state from archive/push metadata;
+- returns discovery evidence and an explicit review caveat;
+- can optionally use a server-side `GITHUB_TOKEN`, but does not require one.
 
-Cloudflare Workers Builds connects to GitHub, runs `npm run build`, and then runs `npx wrangler deploy`. `wrangler.jsonc` declares `./dist` as the static asset directory.
+It does not claim a repository is safe or compatible merely because search metadata looks favorable.
 
-`public/_headers` is copied into `dist/`, where Workers Static Assets parses it and applies the response security headers.
+#### `generate-app`
 
-## Data flow
+- requires a valid Supabase JWT;
+- accepts the project brief, selected OSS evidence, explicit integration decisions, a user-supplied Hugging Face token, and model id;
+- sends the generation request only to `https://router.huggingface.co/v1/chat/completions`;
+- instructs the model not to copy external repository source;
+- requires `README.md` and `OPEN_SOURCE_COMPONENTS.md` in every generated bundle;
+- validates generated paths/file count/size before returning the artifact;
+- always returns `verification_state: "unverified"`.
 
-### Forecast workflow
+The Hugging Face token is request-scoped and is not inserted into Supabase.
 
-1. Browser loads the outer application from Cloudflare Workers.
-2. Browser independently loads the Hugging Face Space iframe.
-3. Researcher uploads CSV data inside the iframe.
-4. Forecast inputs/outputs are handled by the Space/Hugging Face environment.
-5. The outer application does not receive an application-level copy of the CSV.
+## Cloudflare
 
-### Research-log workflow
+GitHub is the source repository. Cloudflare Workers Builds runs `npm run build` and `npx wrangler deploy`. `wrangler.jsonc` deploys the `dist/` directory through Workers Static Assets.
 
-1. The build writes the Supabase project URL and publishable key into generated public `config.js`.
-2. Supabase Auth creates or resumes an anonymous session.
-3. The researcher explicitly enters metadata/notes into the outer research-log form.
-4. Supabase Data API writes those fields into `research_entries`.
-5. RLS constrains reads/deletes/inserts to the current `auth.uid()`.
+`public/_headers` becomes `dist/_headers` and constrains scripts/connections to the required browser dependencies and Supabase endpoints.
 
-## Trust boundaries
+## Generated-code execution boundary
 
-- **Cloudflare Workers Static Assets:** serves this repository's built static assets.
-- **Browser:** holds the Supabase anonymous session and renders both application and cross-origin iframe.
-- **Supabase:** stores only app-owned research metadata when enabled.
-- **Hugging Face Space:** handles CSV upload and model execution.
-- **Google/Hugging Face model repositories:** authoritative documentation/license references, not copied runtime code.
+The control plane does **not** execute generated project shell commands. Arbitrary package installation/build execution requires a dedicated sandbox with resource limits, network policy, secret isolation, timeout enforcement, artifact capture, and log redaction.
 
-## Future inference adapter
+Reviewed reference architectures include bolt.diy, OpenHands, and Dyad. Their runtime models are materially heavier than this Cloudflare/Supabase control plane, so they are architectural references rather than embedded dependencies.
 
-If an authorized TimesFM API becomes available, add a dedicated server-side adapter rather than placing credentials in browser code. The adapter should validate input sizes and schemas, define retention rules, use an explicit model/version identifier, and preserve the visible license/execution disclosure. Do not silently replace the external execution path with a mock or local baseline.
+## Future adapters
+
+Potential future boundaries:
+
+- isolated sandbox executor;
+- GitHub repository/export adapter;
+- pull-request writer;
+- Cloudflare/Vercel/Netlify deployment adapters;
+- dependency vulnerability/license scanner;
+- model-provider adapters beyond Hugging Face.
+
+Each should be added behind a narrow interface without replacing Supabase as the control-plane source of truth.

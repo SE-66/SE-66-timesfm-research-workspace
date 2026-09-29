@@ -1,48 +1,50 @@
 # Data Boundaries
 
-## Cloudflare-hosted outer application
+## Builder metadata stored in Supabase
 
-The outer TimesFM Research Workspace:
+The builder stores app-owned workflow data:
 
-- serves HTML/CSS/JavaScript assets;
-- embeds the external Hugging Face Space;
-- optionally communicates with Supabase for app-owned research metadata;
-- does not expose a TimesFM inference endpoint;
-- does not proxy or receive CSV uploads made inside the Space.
+- project name and brief;
+- stack/deployment preferences;
+- build-run status/stage;
+- GitHub repository discovery metadata;
+- license/maintenance classifications derived from search metadata;
+- explicit integration decisions and rationale;
+- generated source-bundle JSON;
+- artifact verification state.
 
-## Hugging Face Space
+RLS scopes these rows to the current anonymous Supabase user.
 
-The iframe is a separate origin and execution environment. CSV uploads and forecast configuration performed **inside the Space** are handled by the Space/Hugging Face environment according to its current implementation and service policies.
+## GitHub research
 
-This repository does not make retention or access-control claims for the third-party Space beyond what its provider documents.
+The `research-open-source` Edge Function sends only the derived repository search query to GitHub's public repository search API. It does not send the full Supabase user record or Hugging Face token.
 
-## Supabase
+Returned GitHub metadata is discovery evidence, not a legal/security guarantee.
 
-When configured, Supabase stores only data explicitly entered in the outer research log:
+## Hugging Face generation
 
-- entry title;
-- B0/C1–C5 scenario label;
-- dataset label;
-- notes;
-- timestamps;
-- anonymous Supabase user identifier used for RLS ownership.
+When the user clicks **Generate source bundle**, the browser sends the following to the authenticated `generate-app` Edge Function:
 
-The application intentionally does **not** upload the CSV file, iframe state, or TimesFM output automatically to Supabase.
+- project brief and preferences;
+- selected OSS candidate metadata;
+- recorded integration decisions;
+- selected Hugging Face model id;
+- the user-entered Hugging Face token.
 
-### Authentication/session storage
+The Edge Function forwards the token to Hugging Face Inference Providers for that generation request. The token is not written into application tables by the builder code.
 
-The app uses Supabase Anonymous Sign-Ins. The Supabase JavaScript client persists the session in browser storage so the same browser can retrieve its rows later. If the user signs out, clears browser data, or changes devices, the anonymous account is not recoverable unless it was previously linked to a permanent identity.
+Users should use a limited-scope Hugging Face token with only the permissions needed for Inference Providers.
 
-### Authorization
+## Generated source artifacts
 
-The migration enables RLS. The `authenticated` Postgres role can access `research_entries`, but policies require `auth.uid() = user_id`. The unauthenticated `anon` role receives no table privileges.
+The generated bundle is stored as JSON in `builder_artifacts` and may contain application source code, configuration templates, README documentation, and dependency manifests.
 
-## Configuration data
+Generated code must not contain real secrets. Provider/model output is treated as untrusted until reviewed.
 
-`SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` are build-time inputs that are written into browser-visible `config.js`. They are not secrets and must be paired with correct RLS policies.
+## Browser downloads
 
-A Supabase service-role key is privileged and must never be placed in these build variables, GitHub source, or browser output.
+JSZip creates the ZIP entirely in the browser from the stored/generated file list. The ZIP is not uploaded to another service by this application.
 
-## Future persistence rule
+## Legacy table
 
-Any future storage of raw datasets, forecast arrays, files, or PII requires an explicit schema/security/retention review before implementation. Update this file and `SECURITY.md` before enabling such persistence.
+The earlier `research_entries` TimesFM prototype table remains in the database only to preserve migration history. The current builder UI and Edge Functions do not read or write it.

@@ -1,32 +1,19 @@
-# GitHub Repository Setup
+# GitHub Repository
 
-This project uses the dedicated repository:
+The current repository is:
 
 `SE-66/SE-66-timesfm-research-workspace`
 
-Do not attach this codebase to the older `-timesfm-lab` repository.
+The repository name is historical from the discarded prototype. The application itself is now **Open Source App Builder**. Rename the repository later if desired; no application code depends on the current repository name except documentation/source links.
 
 ## Branch workflow
 
 - `main` is the Cloudflare production branch.
-- Use feature branches and pull requests for changes.
-- `.github/workflows/ci.yml` runs repository verification, tests, and the production build.
-- Cloudflare Workers Builds is connected to this repository and deploys the `main` branch.
+- Use feature branches and pull requests for substantial future changes.
+- `.github/workflows/ci.yml` runs the repository verification/test/build commands on pushes and PRs.
 
-## Cloudflare build settings
+## Generated projects
 
-- Build command: `npm run build`
-- Deploy command: `npx wrangler deploy`
-- Root directory: repository root / blank
-- Production branch: `main`
+The current builder downloads source bundles as ZIP/JSON. It does not yet create arbitrary new GitHub repositories from inside the deployed application because that requires a separate authenticated GitHub write integration and repository-creation permission boundary.
 
-## Secrets/configuration
-
-Do not commit Supabase service-role keys or database passwords.
-
-The supported Cloudflare **build-time** variables are browser-visible public configuration:
-
-- `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY`
-
-RLS is the security boundary for Supabase data access.
+Do not expose a personal access token in browser code. A future GitHub export adapter should use OAuth/GitHub App credentials stored server-side and scope permissions narrowly.

@@ -24,7 +24,7 @@ await cp(resolve(root, 'src', 'styles.css'), resolve(dist, 'styles.css'));
 await cp(resolve(root, 'src', 'main.js'), resolve(dist, 'main.js'));
 await cp(resolve(root, 'public'), dist, { recursive: true });
 
-const configSource = `globalThis.__TIMESFM_RESEARCH_CONFIG__ = Object.freeze(${JSON.stringify({
+const configSource = `globalThis.__OPEN_SOURCE_APP_BUILDER_CONFIG__ = Object.freeze(${JSON.stringify({
   supabaseUrl,
   supabasePublishableKey,
 })});\n`;
