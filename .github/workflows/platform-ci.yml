@@ -1,0 +1,54 @@
+name: Platform CI
+
+on:
+  push:
+    branches:
+      - feature/self-hosted-dev-cloud
+    paths:
+      - "platform/**"
+      - "docs/DEV_CLOUD_ARCHITECTURE.md"
+      - ".github/workflows/platform-ci.yml"
+  pull_request:
+    paths:
+      - "platform/**"
+      - "docs/DEV_CLOUD_ARCHITECTURE.md"
+
+permissions:
+  contents: read
+
+jobs:
+  platform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Control-plane tests
+        working-directory: platform/control-plane
+        run: npm test
+      - name: Syntax-check control plane
+        working-directory: platform/control-plane
+        run: node --check src/server.mjs
+      - name: Syntax-check runtime agent
+        working-directory: platform/runtime-agent
+        run: node --check server.mjs
+      - name: Render Docker Compose
+        working-directory: platform
+        env:
+          BASE_DOMAIN: dev.localhost
+          PUBLIC_SCHEME: http
+          CONTROL_PLANE_API_TOKEN: test-control-token
+          RUNTIME_AGENT_TOKEN: test-runtime-token
+          GITEA_ADMIN_USER: devcloud
+          GITEA_ADMIN_EMAIL: admin@example.com
+          GITEA_ADMIN_PASSWORD: test-password
+          GITEA_TOKEN: test-gitea-token
+          GITEA_OWNER: devcloud
+          GITEA_SSH_PORT: 2222
+          SUPABASE_REF: self-hosted/v0.8.2
+          SUPABASE_API_HOST: supabase.dev.localhost
+          SUPABASE_STUDIO_HOST: db.dev.localhost
+          TRAEFIK_CERTRESOLVER: ""
+          ACME_EMAIL: ""
+        run: docker compose config >/tmp/devcloud-compose.yml
