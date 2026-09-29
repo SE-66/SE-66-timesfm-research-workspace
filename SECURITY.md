@@ -2,7 +2,7 @@
 
 ## Threat model
 
-The application has two important external trust boundaries: the embedded Hugging Face Space and optional Supabase persistence. Cloudflare Pages serves only the built static application.
+The application has two important external trust boundaries: the embedded Hugging Face Space and optional Supabase persistence. Cloudflare Workers Static Assets serves only the built static application.
 
 ## Hugging Face iframe
 
@@ -15,8 +15,8 @@ The application has two important external trust boundaries: the embedded Huggin
 ## Supabase browser security
 
 - Only the Supabase project URL and **publishable** key are browser configuration.
-- No service-role key or database password may appear in `SUPABASE_*` public build variables.
-- Anonymous Supabase users use the `authenticated` database role; RLS is therefore mandatory.
+- No service-role key or database password may appear in public build variables.
+- Anonymous Supabase users use the `authenticated` database role; RLS is mandatory.
 - `research_entries` policies restrict rows to `auth.uid() = user_id`.
 - Browser session persistence is expected and documented.
 - The research log is limited to metadata/notes; do not enter secrets or sensitive raw datasets.
@@ -27,7 +27,7 @@ Anonymous sign-ins can be automated. For a broadly public deployment, assess Sup
 
 ## Cloudflare headers
 
-`public/_headers` applies:
+`public/_headers` is copied into the static asset directory `dist/`. Cloudflare Workers Static Assets parses this file and applies:
 
 - Content Security Policy;
 - `X-Frame-Options: DENY` for the outer app;
@@ -45,10 +45,10 @@ This repository does not implement a CSV upload control. Uploads performed insid
 
 Significant dependencies are documented in `OPEN_SOURCE_COMPONENTS.md`. On updates:
 
-1. use official npm packages;
+1. use official packages/distributions;
 2. review license and maintenance status;
 3. keep `package-lock.json` committed;
-4. run `npm audit` and repository checks;
+4. run repository checks;
 5. review unexpected transitive dependency changes;
 6. prefer small, targeted version updates.
 
