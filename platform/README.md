@@ -45,6 +45,24 @@ The script generates local secrets, starts Traefik/Gitea/runtime/dashboard, crea
 
 Default development hostnames use `dev.localhost`. Depending on the resolver, add `dev.localhost`, `git.dev.localhost`, and application subdomains to `/etc/hosts`.
 
+## Cloudflare console
+
+The repository root is a separately deployable Cloudflare static console.
+
+After this server has a public HTTPS control-plane origin:
+
+1. set `DEV_CLOUD_API_URL` in the Cloudflare build environment;
+2. set `DASHBOARD_ORIGINS` in `platform/.env` to the exact Cloudflare console origin;
+3. restart the control-plane service.
+
+For example:
+
+```text
+DASHBOARD_ORIGINS=https://console.example.com
+```
+
+The console asks for `CONTROL_PLANE_API_TOKEN` at runtime. Never put that token into Cloudflare build variables.
+
 ## Add self-hosted Supabase
 
 ```bash

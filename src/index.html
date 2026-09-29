@@ -5,230 +5,163 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Open-source-first app builder that researches reusable projects, records licensing decisions, and generates downloadable application source bundles."
+      content="DevCloud is a self-hosted developer control plane for Git repositories, backend services, deployments, routing, and runtime operations."
     />
-    <title>Open Source App Builder</title>
+    <title>DevCloud Control Plane</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <a class="skip-link" href="#builder">Skip to app builder</a>
+    <a class="skip-link" href="#console">Skip to DevCloud console</a>
 
     <header class="site-header">
       <div class="shell header-row">
         <div>
-          <p class="eyebrow">Inspect → Research → License → Integrate → Build → Verify</p>
-          <h1>Open Source App Builder</h1>
-          <p class="subtitle">Build new applications by researching proven open-source foundations before generating custom code.</p>
+          <p class="eyebrow">SELF-HOSTED DEVELOPER CLOUD</p>
+          <h1>DevCloud</h1>
+          <p class="subtitle">Code · Database · Auth · Storage · Deployments · Domains · Logs</p>
         </div>
         <div class="header-status">
-          <span id="supabase-state" class="status-chip" data-state="loading">Connecting…</span>
+          <span id="platform-state" class="status-chip" data-state="loading">Checking control plane…</span>
           <a href="https://github.com/SE-66/SE-66-timesfm-research-workspace" target="_blank" rel="noopener noreferrer">Source repository ↗</a>
         </div>
       </div>
     </header>
 
-    <main id="builder" class="shell page-grid">
+    <main id="console" class="shell page-grid">
       <section class="main-column">
-        <section class="panel hero-panel" aria-labelledby="brief-heading">
+        <section class="panel hero-panel">
           <div class="section-heading">
             <div>
-              <p class="section-kicker">1 · Define the build</p>
-              <h2 id="brief-heading">What do you want to build?</h2>
+              <p class="section-kicker">Control plane</p>
+              <h2>One project, one developer workspace</h2>
             </div>
-            <span class="policy-chip">Open-source first</span>
+            <span class="policy-chip">Open-source infrastructure</span>
+          </div>
+          <p class="hero-copy">
+            DevCloud combines a Gitea Git plane, Supabase data plane, Traefik routing plane,
+            and a managed container runtime behind one project model. This console only enables
+            actions that the connected control plane actually supports.
+          </p>
+          <div class="capability-grid">
+            <article class="capability"><span>Git</span><strong>Gitea</strong><small>Repositories, branches, pull requests, issues, packages.</small></article>
+            <article class="capability"><span>Data</span><strong>Supabase</strong><small>Postgres, Auth, REST, Realtime, Storage, Functions, Studio.</small></article>
+            <article class="capability"><span>Runtime</span><strong>Docker adapter</strong><small>Deploy public OCI images onto the managed DevCloud network.</small></article>
+            <article class="capability"><span>Routing</span><strong>Traefik</strong><small>Automatic HTTP host routing for managed application containers.</small></article>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="access-heading">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="section-kicker">Admin access</p>
+              <h2 id="access-heading">Connect to the control plane</h2>
+            </div>
+          </div>
+          <div class="access-grid">
+            <label>
+              Control-plane API
+              <input id="api-url" readonly />
+              <span id="api-help" class="field-help"></span>
+            </label>
+            <label>
+              Admin token
+              <input id="admin-token" type="password" autocomplete="off" placeholder="CONTROL_PLANE_API_TOKEN" />
+              <span class="field-help">Stored in this browser tab only. It is never embedded in the site build.</span>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button id="connect-button" class="primary-button" type="button">Connect</button>
+            <span id="access-message" class="form-message" role="status"></span>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="new-project-heading">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Projects</p>
+              <h2 id="new-project-heading">Create a project and private Git repository</h2>
+            </div>
+            <span id="git-service-state" class="status-chip" data-state="loading">Git unknown</span>
           </div>
 
           <form id="project-form" class="project-form">
-            <label>
-              Project name
-              <input id="project-name" name="project-name" maxlength="120" required placeholder="Example: Clinic appointment portal" />
-            </label>
-
-            <label>
-              Application brief
-              <textarea id="project-brief" name="project-brief" rows="8" minlength="10" maxlength="12000" required placeholder="Describe the users, workflows, integrations, data, permissions, deployment constraints, and what must actually work."></textarea>
-            </label>
-
             <div class="field-grid">
               <label>
-                Stack preferences
-                <input id="stack-preferences" maxlength="2000" placeholder="Optional: React, TypeScript, Supabase, Cloudflare" />
+                Project name
+                <input id="project-name" maxlength="120" required placeholder="Example: Analytics console" />
               </label>
               <label>
-                Deployment target
-                <select id="deployment-target">
-                  <option value="cloudflare">Cloudflare</option>
-                  <option value="vercel">Vercel</option>
-                  <option value="netlify">Netlify</option>
-                  <option value="docker">Docker / self-hosted</option>
-                  <option value="other">Other / decide from requirements</option>
-                </select>
+                Project slug
+                <input id="project-slug" maxlength="63" required pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" placeholder="analytics-console" />
               </label>
             </div>
-
             <label>
-              Open-source search query
-              <input id="oss-query" maxlength="180" placeholder="Optional. Leave blank to derive keywords from the brief." />
-              <span class="field-help">GitHub search is discovery only. License, compatibility, security, and source still require review.</span>
+              Description
+              <textarea id="project-description" rows="3" maxlength="2000" placeholder="What this project contains and who it serves."></textarea>
             </label>
-
             <div class="form-actions">
-              <button id="research-button" class="primary-button" type="submit">Create project & research open source</button>
+              <button id="create-project-button" class="primary-button" type="submit">Create project + repository</button>
               <span id="project-message" class="form-message" role="status"></span>
             </div>
           </form>
         </section>
 
-        <section class="panel pipeline-panel" aria-labelledby="pipeline-heading">
-          <div class="section-heading compact-heading">
-            <div>
-              <p class="section-kicker">Build control</p>
-              <h2 id="pipeline-heading">Engineering pipeline</h2>
-            </div>
-            <span id="run-label" class="run-label">No active run</span>
-          </div>
-          <ol id="pipeline" class="pipeline" aria-label="Build pipeline stages">
-            <li data-stage="inspect"><span>01</span><strong>Inspect</strong></li>
-            <li data-stage="research"><span>02</span><strong>Research</strong></li>
-            <li data-stage="license"><span>03</span><strong>License</strong></li>
-            <li data-stage="understand"><span>04</span><strong>Understand</strong></li>
-            <li data-stage="integrate"><span>05</span><strong>Integrate</strong></li>
-            <li data-stage="build"><span>06</span><strong>Build</strong></li>
-            <li data-stage="test"><span>07</span><strong>Test</strong></li>
-            <li data-stage="verify"><span>08</span><strong>Verify</strong></li>
-          </ol>
-          <p class="pipeline-note">This browser app performs discovery, decision capture, and source generation. Generated apps remain <strong>unverified</strong> until their own install/test/build commands run in a sandbox or CI environment.</p>
-        </section>
-
-        <section id="research-section" class="panel" aria-labelledby="research-heading" hidden>
+        <section class="panel" aria-labelledby="projects-heading">
           <div class="section-heading">
             <div>
-              <p class="section-kicker">2 · Research and decide</p>
-              <h2 id="research-heading">Open-source candidates</h2>
+              <p class="section-kicker">Workspace</p>
+              <h2 id="projects-heading">Projects and deployments</h2>
             </div>
-            <button id="refresh-research" class="secondary-button" type="button">Research again</button>
+            <button id="refresh-projects" class="secondary-button" type="button">Refresh</button>
           </div>
-          <p id="research-caveat" class="notice"></p>
-          <div id="candidate-list" class="candidate-list"></div>
-          <div class="custom-decision">
-            <label class="check-row">
-              <input id="custom-implementation" type="checkbox" />
-              <span><strong>No candidate is suitable</strong><br /><small>Record a custom implementation decision instead of reusing an unsuitable project.</small></span>
-            </label>
-            <label>
-              Custom rationale
-              <textarea id="custom-rationale" rows="3" maxlength="4000" placeholder="Why the researched projects are incompatible, insecure, abandoned, over-complex, or legally unsuitable."></textarea>
-            </label>
-          </div>
-          <div class="decision-actions">
-            <button id="save-decisions" class="primary-button" type="button">Save integration decisions</button>
-            <span id="decision-message" class="form-message" role="status"></span>
-          </div>
-        </section>
-
-        <section id="generation-section" class="panel" aria-labelledby="generation-heading" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">3 · Generate source</p>
-              <h2 id="generation-heading">Create the application bundle</h2>
-            </div>
-            <span class="status-chip" data-state="warning">BYOK · token not stored</span>
-          </div>
-
-          <div class="generation-grid">
-            <label>
-              Hugging Face token
-              <input id="hf-token" type="password" autocomplete="off" placeholder="hf_…" />
-              <span class="field-help">Sent once to the Supabase Edge Function and forwarded to Hugging Face Inference Providers. It is not saved in Supabase.</span>
-            </label>
-            <label>
-              Coding model
-              <input id="hf-model" value="Qwen/Qwen3-Coder-480B-A35B-Instruct:fastest" />
-              <span class="field-help">Use a chat-completion model available through Hugging Face Inference Providers.</span>
-            </label>
-          </div>
-
-          <div class="generation-actions">
-            <button id="generate-button" class="primary-button" type="button">Generate source bundle</button>
-            <span id="generation-message" class="form-message" role="status"></span>
-          </div>
-        </section>
-
-        <section id="artifact-section" class="panel" aria-labelledby="artifact-heading" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">4 · Artifact</p>
-              <h2 id="artifact-heading">Generated application</h2>
-            </div>
-            <span id="verification-badge" class="status-chip" data-state="warning">Unverified</span>
-          </div>
-          <p id="artifact-summary" class="artifact-summary"></p>
-          <div class="artifact-actions">
-            <button id="download-zip" class="primary-button" type="button">Download source ZIP</button>
-            <button id="download-json" class="secondary-button" type="button">Download bundle JSON</button>
-          </div>
-          <div class="artifact-grid">
-            <div>
-              <h3>Files</h3>
-              <ul id="artifact-files" class="artifact-list"></ul>
-            </div>
-            <div>
-              <h3>Verification commands</h3>
-              <ol id="verification-commands" class="command-list"></ol>
-              <h3>Known limitations</h3>
-              <ul id="artifact-limitations" class="artifact-list"></ul>
-            </div>
+          <div id="project-list" class="project-list">
+            <p class="empty-state">Connect the control plane to load projects.</p>
           </div>
         </section>
       </section>
 
       <aside class="sidebar">
         <section class="panel sidebar-panel">
-          <p class="section-kicker">Operating rules</p>
-          <h2>What this builder enforces</h2>
+          <p class="section-kicker">Services</p>
+          <h2>Platform endpoints</h2>
+          <div id="service-list" class="service-list">
+            <p class="empty-state">Connect to load service endpoints.</p>
+          </div>
+        </section>
+
+        <section class="panel sidebar-panel">
+          <p class="section-kicker">Current milestone</p>
+          <h2>Operational boundary</h2>
           <ul class="rule-list">
-            <li>Research established open-source solutions before substantial implementation.</li>
-            <li>Prefer maintained, documented, compatible projects over rebuilding generic functionality.</li>
-            <li>Do not treat public GitHub source as automatically reusable.</li>
-            <li>Record license and integration decisions before generated code uses a candidate.</li>
-            <li>Never embed service-role keys, provider tokens, or other secrets in generated source.</li>
-            <li>Never report generated projects as tested when no execution sandbox has run them.</li>
+            <li>Single-admin, single-node control plane.</li>
+            <li>Real private repositories through Gitea.</li>
+            <li>Real public-OCI-image deployments through the Docker runtime adapter.</li>
+            <li>Optional official self-hosted Supabase data plane.</li>
+            <li>No fake multi-tenant IAM, global edge, or production secret vault.</li>
           </ul>
         </section>
 
         <section class="panel sidebar-panel">
-          <div class="section-heading compact-heading">
-            <div>
-              <p class="section-kicker">Workspace</p>
-              <h2>Recent projects</h2>
-            </div>
-            <button id="refresh-projects" class="text-button" type="button">Refresh</button>
+          <p class="section-kicker">Next adapters</p>
+          <h2>Not yet enabled</h2>
+          <div class="roadmap-list">
+            <div><strong>Git-to-image builds</strong><span>Requires isolated build runners and registry credentials.</span></div>
+            <div><strong>Domains + TLS UI</strong><span>Routing exists; managed DNS/certificate workflows are not wired yet.</span></div>
+            <div><strong>Central logs</strong><span>Runtime logs are not yet exposed by the control-plane API.</span></div>
+            <div><strong>Multi-node runtime</strong><span>K3s adapter is the planned isolation/scheduling layer.</span></div>
           </div>
-          <div id="recent-projects" class="recent-projects">
-            <p class="empty-state">No projects loaded yet.</p>
-          </div>
-        </section>
-
-        <section class="panel sidebar-panel reference-panel">
-          <p class="section-kicker">Architecture references</p>
-          <p>The builder was designed after reviewing open-source coding/app-builder projects. They are references, not copied code.</p>
-          <a href="https://github.com/stackblitz-labs/bolt.diy" target="_blank" rel="noopener noreferrer">bolt.diy · MIT ↗</a>
-          <a href="https://github.com/OpenHands/OpenHands" target="_blank" rel="noopener noreferrer">OpenHands · MIT ↗</a>
-          <a href="https://github.com/dyad-sh/dyad" target="_blank" rel="noopener noreferrer">Dyad · mixed Apache-2.0/FSL areas ↗</a>
         </section>
       </aside>
     </main>
 
     <footer class="site-footer">
       <div class="shell footer-row">
-        <span>Open Source App Builder</span>
-        <span>GitHub research · Supabase control plane · Cloudflare deployment</span>
+        <span>DevCloud</span>
+        <span>Gitea · Supabase · Traefik · Docker runtime adapter</span>
       </div>
     </footer>
 
     <script src="./config.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" crossorigin="anonymous"></script>
     <script src="./main.js" defer></script>
   </body>
 </html>

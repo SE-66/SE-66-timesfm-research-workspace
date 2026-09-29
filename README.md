@@ -1,103 +1,101 @@
-# Open Source App Builder
+# DevCloud
 
-Open Source App Builder is a browser-based application builder that follows one rule before substantial implementation: **research established open-source solutions first**.
+DevCloud is an open-source-first developer control plane that combines Git hosting, backend services, application deployments, and routing behind one project model.
 
-The deployed builder lets a user:
+The deployed root application is a **Cloudflare-hosted control console**. The actual stateful services run on the self-hosted DevCloud server under `platform/`.
 
-1. describe an application and deployment constraints;
-2. create a persistent project/run in Supabase;
-3. search GitHub for established repositories through a Supabase Edge Function;
-4. review maintenance and SPDX-license metadata;
-5. explicitly record reuse/reference/reject/custom integration decisions;
-6. generate a complete downloadable source bundle through Hugging Face Inference Providers using a user-supplied Hugging Face token;
-7. store the generated bundle as an **unverified** artifact until its own install/test/build checks are executed elsewhere.
+## Current functional milestone
 
-The application does not claim generated code has passed tests when no execution sandbox has run it.
+The current implementation provides:
 
-## Architecture
+- private Git repositories through **Gitea 1.27.3**;
+- a persistent Node 24 control plane backed by SQLite for project/deployment mappings;
+- an internal Docker runtime agent that deploys public OCI images;
+- automatic HTTP routing through **Traefik 3.7.13**;
+- an optional official self-hosted **Supabase** data plane pinned to `self-hosted/v0.8.2`;
+- a Cloudflare static console that creates projects, opens Git repositories, deploys images, lists deployments, and stops managed deployments through the real control-plane API.
 
-- **Cloudflare Workers Static Assets** — hosts this builder UI from the GitHub repository.
-- **Supabase Auth** — anonymous workspace identity; no email/password login UI.
-- **Supabase Postgres + RLS** — stores projects, build runs, OSS candidates, integration decisions, and generated artifacts per anonymous user.
-- **Supabase Edge Functions** — performs GitHub repository discovery and proxies generation requests.
-- **GitHub REST search** — discovery source for open-source repository metadata.
-- **Hugging Face Inference Providers** — optional source-generation backend using the user's own Hugging Face token and selected chat model.
-- **JSZip** — creates a downloadable ZIP from the generated file bundle in the browser.
+It does **not** present unfinished features as complete. Multi-user IAM, isolated CI runners, a secret vault, managed domains/TLS workflows, central logs, and the k3s multi-node runtime are explicit future adapters.
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md), [SECURITY.md](./SECURITY.md), and [DATA_BOUNDARIES.md](./DATA_BOUNDARIES.md).
+## Repository layout
 
-## Open-source-first behavior
+- `src/` — Cloudflare-hosted DevCloud console.
+- `platform/` — self-hosted control plane, Gitea, Traefik, runtime agent, bootstrap scripts, and optional Supabase integration.
+- `docs/DEV_CLOUD_ARCHITECTURE.md` — platform architecture and trust boundaries.
+- `OPEN_SOURCE_COMPONENTS.md` — external projects, versions, licenses, and integration methods.
 
-Research is not treated as permission to copy. GitHub search results are discovery evidence only. Before generated code is told to reuse a candidate, the workflow records a decision such as dependency, API, component, adapter, fork, architectural reference, or custom implementation.
-
-Unknown, reciprocal, restrictive, and source-available licenses are not treated as permissive. Generated bundles are instructed to depend on or reference external projects instead of copying repository source, and every generated project must include `OPEN_SOURCE_COMPONENTS.md`.
-
-Builder provenance and reviewed reference projects are in [OPEN_SOURCE_COMPONENTS.md](./OPEN_SOURCE_COMPONENTS.md) and [docs/SOURCE_REVIEW.md](./docs/SOURCE_REVIEW.md).
-
-## Local development
+## Run the Cloudflare console locally
 
 Requires Node.js 20+.
 
+Without a backend:
+
 ```bash
 npm ci
-SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co \
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_... \
 npm run dev
 ```
 
-Run the repository checks:
+The UI renders but clearly reports that the control plane is not configured.
+
+With a live DevCloud API:
+
+```bash
+DEV_CLOUD_API_URL=https://devcloud-api.example.com npm run dev
+```
+
+The API URL is public browser configuration. The administrative `CONTROL_PLANE_API_TOKEN` is entered interactively and stored only in browser `sessionStorage`.
+
+Run all root checks:
 
 ```bash
 npm run check
 ```
 
-The production build is written to `dist/`.
+## Run the self-hosted platform
 
-## Supabase
+Requirements: Linux, Docker Engine + Compose plugin, Git, and OpenSSL.
 
-The live project created for this builder is:
+```bash
+cd platform
+sh scripts/bootstrap.sh
+```
 
-`https://vuwxwbdptspvbxptpmub.supabase.co`
+Then optionally add the official self-hosted Supabase stack:
 
-Anonymous Sign-Ins must be enabled. The builder schema is defined in:
+```bash
+sh scripts/bootstrap-supabase.sh
+```
 
-`supabase/migrations/20260929080000_create_open_source_app_builder_core.sql`
+See [platform/README.md](./platform/README.md) and [platform/SECURITY.md](./platform/SECURITY.md).
 
-The Edge Functions are:
+## Cloudflare deployment
 
-- `research-open-source`
-- `generate-app`
+The repository remains configured for Cloudflare Workers Builds + Static Assets:
 
-See [docs/SUPABASE.md](./docs/SUPABASE.md).
+- production branch: `main`;
+- build command: `npm run build`;
+- deploy command: `npx wrangler deploy`;
+- root directory: repository root;
+- static output: `dist/`.
 
-## Hugging Face generation
+Once the DevCloud server is online, set the Cloudflare **build variable**:
 
-The builder does not store a Hugging Face token. A user enters a token only when generating source. It is sent to the authenticated Supabase Edge Function and forwarded to Hugging Face Inference Providers for that request.
+```
+DEV_CLOUD_API_URL=https://<public-control-plane-origin>
+```
 
-The default model field is:
+The production build validates that the API uses HTTPS and generates a CSP that permits network requests only to the configured control-plane origin.
 
-`Qwen/Qwen3-Coder-480B-A35B-Instruct:fastest`
-
-Users may enter another chat-completion model available through Hugging Face Inference Providers. Model licensing and provider charges remain the user's responsibility.
-
-## Cloudflare Workers deployment
-
-The repository is configured for the Cloudflare **Workers Builds + Static Assets** workflow.
-
-- Production branch: `main`
-- Build command: `npm run build`
-- Deploy command: `npx wrangler deploy`
-- Root directory: repository root / blank
-- Required build variables:
-  - `SUPABASE_URL`
-  - `SUPABASE_PUBLISHABLE_KEY`
-
-`wrangler.jsonc` deploys `./dist` as static assets.
+The server must also list the Cloudflare console origin in `DASHBOARD_ORIGINS` so browser CORS requests are accepted.
 
 See [docs/CLOUDFLARE.md](./docs/CLOUDFLARE.md).
 
-## Current verification boundary
+## Security boundary
 
-This repository's own checks can be executed and verified. Generated application bundles cannot safely execute arbitrary package installs or shell commands inside the current Cloudflare/Supabase architecture. Therefore generated artifacts are stored as `unverified` and include the commands that must be run in a sandbox or CI system.
+The first runtime agent mounts the Docker socket and therefore has host-equivalent authority. It is intentionally internal-only. This milestone is suitable as a single-admin bootstrap, not as an internet-facing multi-tenant execution environment.
 
-A future execution adapter should isolate untrusted generated code in a dedicated sandbox rather than running it inside the Supabase Edge Function or browser.
+Before multi-user use, the roadmap requires IAM/SSO, a secret vault/KMS, isolated build workers, quotas, audit logs, backups, and a k3s-based workload isolation layer.
+
+## Open-source provenance
+
+DevCloud integrates upstream projects through supported containers and APIs rather than copying their source. Important components and reviewed licenses are recorded in [OPEN_SOURCE_COMPONENTS.md](./OPEN_SOURCE_COMPONENTS.md).

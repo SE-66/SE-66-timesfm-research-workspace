@@ -8,6 +8,12 @@ import { validImage, validPort, validSlug } from './validation.mjs';
 const env = process.env;
 const port = Number(env.PORT || 8080);
 const dataDir = env.DATA_DIR || '/data';
+const dashboardOrigins = new Set(
+  String(env.DASHBOARD_ORIGINS || '')
+    .split(',')
+    .map((value) => value.trim().replace(/\/+$/, ''))
+    .filter(Boolean)
+);
 mkdirSync(dataDir, { recursive: true });
 
 const db = new DatabaseSync(join(dataDir, 'devcloud.sqlite'));
@@ -34,6 +40,17 @@ db.exec(
   'created_at TEXT NOT NULL' +
   ');'
 );
+
+function applyCors(req, res) {
+  const origin = String(req.headers.origin || '').replace(/\/+$/, '');
+  if (!origin || !dashboardOrigins.has(origin)) return false;
+
+  res.setHeader('access-control-allow-origin', origin);
+  res.setHeader('access-control-allow-methods', 'GET,POST,DELETE,OPTIONS');
+  res.setHeader('access-control-allow-headers', 'authorization,content-type');
+  res.setHeader('vary', 'Origin');
+  return true;
+}
 
 function sendJson(res, status, body) {
   const payload = JSON.stringify(body);
@@ -114,6 +131,13 @@ async function serviceHealth() {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://control-plane.local');
+    const corsAllowed = applyCors(req, res);
+
+    if (req.method === 'OPTIONS') {
+      if (!corsAllowed) return sendJson(res, 403, { error: 'origin not allowed' });
+      res.writeHead(204);
+      return res.end();
+    }
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
       return sendJson(res, 200, await serviceHealth());

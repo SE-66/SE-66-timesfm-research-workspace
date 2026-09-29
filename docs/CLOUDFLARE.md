@@ -1,6 +1,8 @@
 # Cloudflare Workers Deployment
 
-This repository uses **Cloudflare Workers Builds + Static Assets**, not legacy Pages configuration.
+This repository uses **Cloudflare Workers Builds + Static Assets** for the DevCloud browser console.
+
+The stateful DevCloud services themselves do not run inside Cloudflare. Gitea, the control plane, the runtime agent, Traefik, and optional self-hosted Supabase run on the Linux DevCloud host under `platform/`.
 
 ## Git build settings
 
@@ -17,39 +19,62 @@ Use:
 
 `wrangler.jsonc` deploys `./dist` as Worker static assets.
 
-## Required build variables
+## DevCloud API build variable
 
-Add both variables to the production build environment and to preview builds if previews should be functional:
+The console can deploy before the backend exists. In that state it renders the real DevCloud UI but marks backend actions unavailable.
+
+Once the DevCloud server has a public HTTPS control-plane origin, add this **build variable**:
 
 ```text
-SUPABASE_URL=https://vuwxwbdptspvbxptpmub.supabase.co
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+DEV_CLOUD_API_URL=https://devcloud-api.example.com
 ```
 
-Use the Supabase **publishable** key. Never use a secret/service-role key.
+Do not put `CONTROL_PLANE_API_TOKEN` in Cloudflare environment variables or browser source. The console asks the administrator for that token at runtime and keeps it in `sessionStorage` only.
 
-A successful build prints:
+A configured build prints:
 
-`Built static site to dist/ (Supabase enabled).`
+`Built DevCloud console to dist/ (control-plane API configured).`
 
-If it prints `Supabase disabled`, the builder UI can load but project/research/generation actions are intentionally disabled.
+An unconfigured build prints:
+
+`Built DevCloud console to dist/ (control-plane API not configured).`
+
+## Server-side browser allowlist
+
+When the Cloudflare console and control plane are on different origins, the server must explicitly allow the console origin.
+
+Set `DASHBOARD_ORIGINS` in `platform/.env` to one or more comma-separated origins, for example:
+
+```text
+DASHBOARD_ORIGINS=https://console.example.com,https://preview.example.com
+```
+
+The control plane reflects CORS headers only for exact configured origins.
+
+## CSP generation
+
+`public/_headers` contains a build marker for the API origin.
+
+During `npm run build`, the build script:
+
+1. validates `DEV_CLOUD_API_URL`;
+2. requires HTTPS except for localhost development;
+3. inserts only that exact origin into `connect-src`;
+4. writes the result to `dist/_headers`.
+
+No Supabase browser key, Gitea API token, runtime-agent token, or control-plane admin token is embedded in the Cloudflare bundle.
 
 ## Public URL
 
-After deployment, enable a `workers.dev` route or custom domain under the Worker's **Settings → Domains & Routes**. The Worker currently has no public URL until a route is enabled.
+Enable a `workers.dev` route or custom domain under the Worker's **Settings → Domains & Routes**.
 
-## Headers
-
-`public/_headers` is copied into `dist/_headers` and constrains:
-
-- script origins;
-- Supabase network connections;
-- framing;
-- browser capability permissions.
+For production, use a custom HTTPS domain for both the console and DevCloud API.
 
 ## Deployment verification
 
-Cloudflare build logs should show both:
+Cloudflare build logs should show:
 
 1. `npm run build` succeeds;
-2. `npx wrangler deploy` uploads `./dist` using the `assets.directory` configuration.
+2. the build reports whether the DevCloud API is configured;
+3. `npx wrangler deploy` uploads `./dist` through `assets.directory`;
+4. the deployed page title is **DevCloud Control Plane**, not **Open Source App Builder**.
