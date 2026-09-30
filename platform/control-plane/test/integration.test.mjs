@@ -191,7 +191,7 @@ test('control plane project and deployment flow works against service adapters',
   assert.equal(project.repo_url, 'http://git.test/devcloud/smoke-test-app');
   assert.equal(calls.repos.length, 1);
   assert.equal(calls.repos[0].private, true);
-  assert.equal(cals.repos[0].auto_init, true);
+  assert.equal(calls.repos[0].auto_init, true);
 
   const projectsResponse = await fetch(`${origin}/api/projects`, { headers });
   assert.equal(projectsResponse.status, 200);
