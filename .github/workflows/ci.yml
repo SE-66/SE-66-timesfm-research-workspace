@@ -23,3 +23,11 @@ jobs:
         run: npm ci
       - name: Verify, test, and build
         run: npm run check
+      - name: Configured DevCloud build smoke test
+        env:
+          DEV_CLOUD_API_URL: http://localhost:8080
+        run: |
+          npm run build
+          grep -F '"devCloudApiUrl":"http://localhost:8080"' dist/config.js
+          grep -F "connect-src 'self' http://localhost:8080" dist/_headers
+          grep -F "DevCloud Control Plane" dist/index.html
